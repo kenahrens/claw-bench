@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${TASK_INSTRUCTION:?TASK_INSTRUCTION is required}"
+IFS=$'\t' read -r resolved_task_id resolved_task_instruction < <(
+  TASK_REF="${TASK_REF:-}" TASK_ID="${TASK_ID:-}" TASK_INSTRUCTION="${TASK_INSTRUCTION:-}" ./scripts/resolve-task.sh
+)
 
 namespace="${NAMESPACE:-claw-bench}"
 daemon_name="${DAEMON_NAME:-zeroclaw-daemon}"
@@ -15,7 +17,7 @@ if [[ -z "${token_b64}" ]]; then
 fi
 
 token="$(printf '%s' "${token_b64}" | base64 --decode)"
-payload="$(TASK_INSTRUCTION="${TASK_INSTRUCTION}" python3 -c 'import json,os; print(json.dumps({"message": os.environ["TASK_INSTRUCTION"]}))')"
+payload="$(TASK_INSTRUCTION="${resolved_task_instruction}" python3 -c 'import json,os; print(json.dumps({"message": os.environ["TASK_INSTRUCTION"]}))')"
 
 pod_name="$(kubectl get pods -n "${namespace}" -l app="${daemon_name}" -o jsonpath='{.items[0].metadata.name}')"
 if [[ -z "${pod_name}" ]]; then
@@ -34,7 +36,8 @@ response="$(curl -sS -X POST "http://127.0.0.1:${local_port}/webhook" \
   -d "${payload}")"
 
 mkdir -p results
-out_file="results/${daemon_name}-daemon-$(date +%s).json"
+task_suffix="$(printf '%s' "${resolved_task_id}" | tr '[:upper:]' '[:lower:]')"
+out_file="results/${daemon_name}-${task_suffix}-daemon-$(date +%s).json"
 printf '%s\n' "${response}" > "${out_file}"
 
 echo "saved daemon response to ${out_file}"

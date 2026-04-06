@@ -14,3 +14,5 @@
 - [x] Add ZeroClaw daemon-mode benchmark track using Kubernetes deployment + service templates.
 - [x] Add daemon lifecycle scripts to deploy/pair, submit HTTP tasks, and remove daemon resources.
 - [x] Document daemon-mode workflow in README as a separate steady-state benchmark path.
+- [x] Add standard task aliases (`TASK_1`, `TASK_2`, ...) for simpler benchmark execution.
+- [x] Add make targets for indexed job and daemon task runs without per-run instruction env vars.
