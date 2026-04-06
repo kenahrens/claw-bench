@@ -23,9 +23,6 @@ build-zeroclaw-adapter:
 tasks:
 	./scripts/list-tasks.sh
 
-easy:
-	./scripts/easy-button.sh
-
 deploy-daemon:
 	./scripts/deploy-daemon.sh
 
@@ -40,6 +37,10 @@ run-task-%:
 
 daemon-task-%:
 	TASK_REF=TASK_$* ./scripts/submit-daemon-task.sh
+
+easy:
+	./scripts/easy-button.sh
+
 run:
 	./scripts/run-task.sh
 
