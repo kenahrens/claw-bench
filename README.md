@@ -16,7 +16,6 @@ Kubernetes-first benchmark harness for the 2026 Claw runtime shootout.
 - `k8s/templates`: generic and ZeroClaw-specific Job manifests.
 - `adapters/zeroclaw`: optional adapter image for restrictive runtime needs.
 - `scripts`: render, run, and collect benchmark artifacts.
-- `docs/blog-draft.md`: starter outline for the Speedscale blog.
 
 ## Prereqs
 
