@@ -1,0 +1,13 @@
+tasks:
+  - id: T001
+    category: bugfix
+    difficulty: medium
+    instruction: Fix failing tests and explain root cause.
+  - id: T002
+    category: refactor
+    difficulty: medium
+    instruction: Refactor duplicated logic into a shared helper with tests.
+  - id: T003
+    category: feature
+    difficulty: hard
+    instruction: Add a new API endpoint and integration test coverage.
