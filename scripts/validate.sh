@@ -5,7 +5,16 @@ echo "[validate] shell syntax"
 bash -n scripts/*.sh
 
 echo "[validate] python syntax"
-python3 -m py_compile scripts/*.py
+python3 - <<'PY'
+import ast
+from pathlib import Path
+
+for path in Path("scripts").glob("*.py"):
+    source = path.read_text(encoding="utf-8")
+    ast.parse(source, filename=str(path))
+
+print("python syntax ok")
+PY
 
 echo "[validate] config integrity"
 python3 - <<'PY'

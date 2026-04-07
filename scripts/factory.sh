@@ -123,4 +123,7 @@ make collect
 echo "[factory] score artifacts"
 make score
 
-echo "[factory] done (results/score.json, results/matrix-preflight.tsv)"
+echo "[factory] build comparison summary"
+make factory-summary
+
+echo "[factory] done (results/score.json, results/matrix-preflight.tsv, results/factory-summary.json)"
