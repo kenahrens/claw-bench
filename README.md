@@ -58,7 +58,7 @@ Use only these commands:
 2. `make bench-init` - one-time bootstrap + verify cluster secrets.
 3. `make bench-smoke` - cheap synthetic canary (expects `SMOKE_OK`).
 4. `make bench-run` - full clean end-to-end comparison run.
-5. `make bench-report` - collect + score latest artifacts.
+5. `make bench-report` - collect + score + summary (`results/factory-summary.json`).
 
 Optional helper commands:
 
@@ -103,6 +103,7 @@ Notes:
 - Use `k8s/templates/job-zeroclaw.yaml` when the default template fails due to stricter runtime assumptions.
 - The ZeroClaw template keeps non-root and dropped caps but allows writable root filesystem when required.
 - Logs are written to `results/*.txt` for post-run scoring and analysis.
+- Final comparison summary is written to `results/factory-summary.json`.
 
 ## Strategy Reset (Next)
 
@@ -117,4 +118,4 @@ The next iteration shifts from command-by-command execution to a factory workflo
 
 `make factory` now provides an end-to-end run path: setup, matrix preflight, matrix execution, log collection, and scoring.
 
-The remaining factory follow-up work is focused on canonical 5-task locking, stricter preflight diagnostics, and richer final comparison artifacts.
+The remaining factory follow-up work is focused on stricter preflight diagnostics (`make doctor`) and blocker clarity for full 5-agent comparisons.
