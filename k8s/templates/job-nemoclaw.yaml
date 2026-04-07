@@ -21,21 +21,27 @@ spec:
           image: ${AGENT_IMAGE}
           imagePullPolicy: IfNotPresent
           workingDir: /workspace
-          command: ["${AGENT_BIN}", "${AGENT_ACTION}", "${TASK_INSTRUCTION}"]
+          command:
+            - sh
+            - -lc
+            - >-
+              openclaw models set "$$DEFAULT_PROVIDER/$$DEFAULT_MODEL" || true;
+              openclaw agent --local --agent main -m "$$TASK_PROMPT" --json
           env:
             - name: HOME
               value: /home/node
+            - name: TASK_PROMPT
+              value: "${TASK_INSTRUCTION}"
+            - name: DEFAULT_PROVIDER
+              value: "${DEFAULT_PROVIDER}"
+            - name: DEFAULT_MODEL
+              value: "${DEFAULT_MODEL}"
             - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
                   key: llm_api_key
             - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: claw-secrets
-                  key: llm_api_key
-            - name: ZEROCLAW_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
@@ -60,10 +66,6 @@ spec:
                 secretKeyRef:
                   name: claw-secrets
                   key: github_token
-            - name: ZEROCLAW_DEFAULT_PROVIDER
-              value: "${DEFAULT_PROVIDER}"
-            - name: ZEROCLAW_DEFAULT_MODEL
-              value: "${DEFAULT_MODEL}"
           resources:
             requests:
               cpu: "${RESOURCE_CPU_REQUEST}"

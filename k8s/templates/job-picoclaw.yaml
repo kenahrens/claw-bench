@@ -21,26 +21,17 @@ spec:
           image: ${AGENT_IMAGE}
           imagePullPolicy: IfNotPresent
           workingDir: /workspace
-          command: ["${AGENT_BIN}", "${AGENT_ACTION}", "${TASK_INSTRUCTION}"]
+          command: ["sh", "-lc", "/workspace/scripts/run-picoclaw-once.sh"]
           env:
             - name: HOME
-              value: /home/node
+              value: /home/picoclaw
+            - name: TASK_PROMPT
+              value: "${TASK_INSTRUCTION}"
+            - name: DEFAULT_PROVIDER
+              value: "${DEFAULT_PROVIDER}"
+            - name: DEFAULT_MODEL
+              value: "${DEFAULT_MODEL}"
             - name: LLM_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: claw-secrets
-                  key: llm_api_key
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: claw-secrets
-                  key: llm_api_key
-            - name: ZEROCLAW_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: claw-secrets
-                  key: llm_api_key
-            - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
@@ -50,20 +41,16 @@ spec:
                 secretKeyRef:
                   name: claw-secrets
                   key: openai_api_key
-            - name: ANTHROPIC_API_KEY
+            - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
-                  key: anthropic_api_key
+                  key: openai_api_key
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
                   key: github_token
-            - name: ZEROCLAW_DEFAULT_PROVIDER
-              value: "${DEFAULT_PROVIDER}"
-            - name: ZEROCLAW_DEFAULT_MODEL
-              value: "${DEFAULT_MODEL}"
           resources:
             requests:
               cpu: "${RESOURCE_CPU_REQUEST}"
@@ -75,7 +62,7 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop: ["ALL"]
             seccompProfile:
@@ -85,13 +72,9 @@ spec:
               mountPath: /workspace
             - name: tmp
               mountPath: /tmp
-            - name: home
-              mountPath: /home/node
       volumes:
         - name: workspace
           persistentVolumeClaim:
             claimName: claw-workspace
         - name: tmp
-          emptyDir: {}
-        - name: home
           emptyDir: {}

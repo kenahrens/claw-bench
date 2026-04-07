@@ -1,11 +1,14 @@
 SHELL := /bin/bash
+KUBE_CONTEXT ?= minikube
+KUBECTL := kubectl --context $(KUBE_CONTEXT)
+export KUBE_CONTEXT
 
-.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon submit-daemon-task remove-daemon run run-matrix collect score
+.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report smoke-each smoke-one factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon submit-daemon-task remove-daemon run run-matrix collect score
 
 setup:
-	kubectl apply -f k8s/base/namespace.yaml
-	kubectl apply -f k8s/base/pvc.yaml
-	kubectl apply -f k8s/base/networkpolicy.yaml
+	$(KUBECTL) apply -f k8s/base/namespace.yaml
+	$(KUBECTL) apply -f k8s/base/pvc.yaml
+	$(KUBECTL) apply -f k8s/base/networkpolicy.yaml
 	@echo "Run make setup-secrets and make sync-workspace before benchmark jobs."
 
 setup-secrets:
@@ -49,6 +52,7 @@ bench-help:
 	@echo "  make bench-init   # one-time setup + verify cluster secrets"
 	@echo "  make validate     # non-cluster config/script validation"
 	@echo "  make bench-smoke  # cheap canary run (1 task, zeroclaw)"
+	@echo "  make smoke-each   # per-agent hello-world readiness checks"
 	@echo "  make bench-run    # full clean end-to-end comparison"
 	@echo "  make bench-report # collect + score latest artifacts"
 	@echo "  make bench-reset  # clean local/k8s run state"
@@ -69,6 +73,12 @@ bench-report:
 	make collect
 	make score
 	make factory-summary
+
+smoke-each:
+	python3 ./scripts/smoke-each.py
+
+smoke-one:
+	./scripts/run-smoke-one.sh
 
 factory-summary:
 	python3 ./scripts/build-factory-summary.py

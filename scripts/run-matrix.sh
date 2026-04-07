@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kube.sh
+source "${script_dir}/lib/kube.sh"
+
 matrix_file="${AGENT_MATRIX_FILE:-config/agents.csv}"
 safety_file="${AGENT_SAFETY_FILE:-config/agents-safety.csv}"
 repeat_count="${REPEAT_COUNT:-1}"
@@ -33,7 +37,7 @@ if ! [[ "${preflight_only}" =~ ^(true|false)$ ]]; then
   exit 1
 fi
 
-if command -v minikube >/dev/null 2>&1 && [[ "$(kubectl config current-context 2>/dev/null || true)" == "minikube" ]]; then
+if command -v minikube >/dev/null 2>&1 && [[ "$(kctl config current-context 2>/dev/null || true)" == "minikube" ]]; then
   eval "$(minikube docker-env)"
 fi
 

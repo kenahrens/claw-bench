@@ -41,17 +41,17 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
-                  key: llm_api_key
+                  key: openai_api_key
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
-                  key: llm_api_key
+                  key: openai_api_key
             - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
-                  key: llm_api_key
+                  key: anthropic_api_key
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:

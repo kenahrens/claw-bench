@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kube.sh
+source "${script_dir}/lib/kube.sh"
+
 namespace="${NAMESPACE:-claw-bench}"
 pvc_name="${WORKSPACE_PVC_NAME:-claw-workspace}"
 pod_name="workspace-sync-$(date +%s)"
@@ -29,20 +33,20 @@ spec:
         claimName: ${pvc_name}
 EOF
 
-kubectl apply -f "${manifest}" >/dev/null
+kctl apply -f "${manifest}" >/dev/null
 
 cleanup() {
-  kubectl delete pod "${pod_name}" -n "${namespace}" --ignore-not-found >/dev/null 2>&1 || true
+  kctl delete pod "${pod_name}" -n "${namespace}" --ignore-not-found >/dev/null 2>&1 || true
 }
 trap 'cleanup; rm -f "${manifest}"' EXIT
 
-kubectl wait --for=condition=Ready --timeout=120s "pod/${pod_name}" -n "${namespace}" >/dev/null
+kctl wait --for=condition=Ready --timeout=120s "pod/${pod_name}" -n "${namespace}" >/dev/null
 
 tar \
   --exclude='.git' \
   --exclude='results' \
   --exclude='.env' \
   --exclude='.env.*' \
-  -cf - . | kubectl exec -i "${pod_name}" -n "${namespace}" -- /bin/sh -lc "rm -rf /workspace/* /workspace/.[!.]* /workspace/..?* 2>/dev/null || true; tar -xf - -C /workspace"
+  -cf - . | kctl exec -i "${pod_name}" -n "${namespace}" -- /bin/sh -lc "rm -rf /workspace/* /workspace/.[!.]* /workspace/..?* 2>/dev/null || true; tar -xf - -C /workspace"
 
 echo "synced repository contents to pvc ${pvc_name} in namespace ${namespace}"

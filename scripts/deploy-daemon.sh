@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kube.sh
+source "${script_dir}/lib/kube.sh"
+
 namespace="${NAMESPACE:-claw-bench}"
 daemon_name="${DAEMON_NAME:-zeroclaw-daemon}"
 daemon_port="${DAEMON_PORT:-8787}"
@@ -27,20 +31,20 @@ fi
 
 export DAEMON_NAME="${daemon_name}" DAEMON_PORT="${daemon_port}" AGENT_IMAGE="${agent_image}" DEFAULT_PROVIDER="${default_provider}" DEFAULT_MODEL="${default_model}" MAX_TOOL_ITERATIONS="${max_tool_iterations}" APPROVAL_MODE="${approval_mode}" RESOURCE_CPU_REQUEST="${resource_cpu_request}" RESOURCE_CPU_LIMIT="${resource_cpu_limit}" RESOURCE_MEMORY_REQUEST="${resource_memory_request}" RESOURCE_MEMORY_LIMIT="${resource_memory_limit}"
 
-envsubst < k8s/templates/deployment-zeroclaw-daemon.yaml | kubectl apply -f -
-envsubst < k8s/templates/service-zeroclaw-daemon.yaml | kubectl apply -f -
+envsubst < k8s/templates/deployment-zeroclaw-daemon.yaml | kctl apply -f -
+envsubst < k8s/templates/service-zeroclaw-daemon.yaml | kctl apply -f -
 
-kubectl rollout status "deployment/${daemon_name}" -n "${namespace}" --timeout=180s
+kctl rollout status "deployment/${daemon_name}" -n "${namespace}" --timeout=180s
 
-pod_name="$(kubectl get pods -n "${namespace}" -l app="${daemon_name}" -o jsonpath='{.items[0].metadata.name}')"
-pair_code="$(kubectl logs "${pod_name}" -n "${namespace}" 2>&1 | perl -ne 'if(/X-Pairing-Code: ([0-9]+)/){print $1; exit}')"
+pod_name="$(kctl get pods -n "${namespace}" -l app="${daemon_name}" -o jsonpath='{.items[0].metadata.name}')"
+pair_code="$(kctl logs "${pod_name}" -n "${namespace}" 2>&1 | perl -ne 'if(/X-Pairing-Code: ([0-9]+)/){print $1; exit}')"
 
 if [[ -z "${pair_code}" ]]; then
   echo "error: unable to find daemon pairing code in pod logs" >&2
   exit 1
 fi
 
-kubectl port-forward -n "${namespace}" "pod/${pod_name}" "${local_port}:${daemon_port}" >/tmp/${daemon_name}-port-forward.log 2>&1 &
+kctl port-forward -n "${namespace}" "pod/${pod_name}" "${local_port}:${daemon_port}" >/tmp/${daemon_name}-port-forward.log 2>&1 &
 pf_pid=$!
 trap 'kill ${pf_pid} >/dev/null 2>&1 || true' EXIT
 sleep 2
@@ -53,9 +57,9 @@ if [[ -z "${token}" ]]; then
   exit 1
 fi
 
-kubectl create secret generic "${daemon_name}-auth" \
+kctl create secret generic "${daemon_name}-auth" \
   -n "${namespace}" \
   --from-literal=bearer_token="${token}" \
-  --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  --dry-run=client -o yaml | kctl apply -f - >/dev/null
 
 echo "deployed ${daemon_name} and stored auth token in secret ${daemon_name}-auth"

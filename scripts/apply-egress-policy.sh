@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kube.sh
+source "${script_dir}/lib/kube.sh"
+
 NAMESPACE="${NAMESPACE:-claw-bench}"
 ALLOW_PACKAGE_REGISTRIES="${ALLOW_PACKAGE_REGISTRIES:-false}"
 
@@ -78,5 +82,5 @@ EOF
   done
 } > "${manifest}"
 
-kubectl apply -f "${manifest}"
+kctl apply -f "${manifest}"
 echo "applied claw-egress-allowlist in namespace ${NAMESPACE} (${#unique_ips[@]} IPs)"

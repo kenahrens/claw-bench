@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kube.sh
+source "${script_dir}/lib/kube.sh"
+
 profile_file="${EVAL_PROFILE_FILE:-config/eval.env}"
 
 if [[ -f "${profile_file}" ]]; then
@@ -37,10 +41,10 @@ blockers=()
 
 echo "[doctor] mode=${doctor_mode}"
 
-if ! kubectl config current-context >/dev/null 2>&1; then
+if ! kctl config current-context >/dev/null 2>&1; then
   blockers+=("kubectl context is not configured")
 else
-  context="$(kubectl config current-context)"
+  context="$(kctl config current-context)"
   echo "[doctor] kubectl context=${context}"
 fi
 
