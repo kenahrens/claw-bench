@@ -21,21 +21,37 @@ spec:
           image: ${AGENT_IMAGE}
           imagePullPolicy: IfNotPresent
           workingDir: /workspace
-          command: ["${AGENT_BIN}", "${AGENT_ACTION}", "${TASK_INSTRUCTION}"]
+          command:
+            - sh
+            - -lc
+            - >-
+              mkdir -p /tmp/nanoclaw && node -e 'const payload = {
+              prompt: process.env.TASK_PROMPT || "",
+              groupFolder: process.env.GROUP_FOLDER || "/tmp/nanoclaw",
+              chatJid: process.env.CHAT_JID || "claw-bench",
+              isMain: true,
+              options: {
+                pathToClaudeCodeExecutable: process.env.CLAUDE_CODE_PATH || "/app/node_modules/.bin/anthropic-ai-sdk"
+              }
+              }; if (process.env.SESSION_ID) payload.sessionId = process.env.SESSION_ID;
+              process.stdout.write(JSON.stringify(payload));' | /app/entrypoint.sh
           env:
             - name: HOME
               value: /home/node
+            - name: TASK_PROMPT
+              value: "${TASK_INSTRUCTION}"
+            - name: GROUP_FOLDER
+              value: /tmp/nanoclaw
+            - name: CHAT_JID
+              value: "${AGENT_NAME}-${TASK_ID}"
+            - name: CLAUDE_CODE_PATH
+              value: /app/node_modules/.bin/anthropic-ai-sdk
             - name: LLM_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
-                  key: llm_api_key
+                  key: anthropic_api_key
             - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: claw-secrets
-                  key: llm_api_key
-            - name: ZEROCLAW_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
@@ -60,10 +76,6 @@ spec:
                 secretKeyRef:
                   name: claw-secrets
                   key: github_token
-            - name: ZEROCLAW_DEFAULT_PROVIDER
-              value: "${DEFAULT_PROVIDER}"
-            - name: ZEROCLAW_DEFAULT_MODEL
-              value: "${DEFAULT_MODEL}"
           resources:
             requests:
               cpu: "${RESOURCE_CPU_REQUEST}"
@@ -83,6 +95,10 @@ spec:
           volumeMounts:
             - name: workspace
               mountPath: /workspace
+            - name: ipc
+              mountPath: /workspace/ipc
+            - name: group
+              mountPath: /workspace/group
             - name: tmp
               mountPath: /tmp
             - name: home
@@ -91,6 +107,10 @@ spec:
         - name: workspace
           persistentVolumeClaim:
             claimName: claw-workspace
+        - name: ipc
+          emptyDir: {}
+        - name: group
+          emptyDir: {}
         - name: tmp
           emptyDir: {}
         - name: home

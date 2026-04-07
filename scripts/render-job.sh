@@ -35,9 +35,14 @@ if [[ "${AGENT_NAME}" == "zeroclaw" ]]; then
     echo "error: APPROVAL_MODE must be default, strict, or none" >&2
     exit 1
   fi
+elif [[ "${AGENT_NAME}" == "picoclaw" ]]; then
+  DEFAULT_PROVIDER="${DEFAULT_PROVIDER:-openai}"
+  DEFAULT_MODEL="${DEFAULT_MODEL:-gpt-4o-mini}"
+  MAX_TOOL_ITERATIONS=""
+  APPROVAL_MODE=""
 else
-  DEFAULT_PROVIDER="${DEFAULT_PROVIDER:-}"
-  DEFAULT_MODEL="${DEFAULT_MODEL:-}"
+  DEFAULT_PROVIDER="${DEFAULT_PROVIDER:-openai}"
+  DEFAULT_MODEL="${DEFAULT_MODEL:-gpt-5-mini}"
   MAX_TOOL_ITERATIONS=""
   APPROVAL_MODE=""
 fi

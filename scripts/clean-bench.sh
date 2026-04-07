@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/kube.sh
+source "${script_dir}/lib/kube.sh"
+
 namespace="${NAMESPACE:-claw-bench}"
 clean_results="${CLEAN_RESULTS:-true}"
 
@@ -13,10 +17,10 @@ echo "[clean] remove daemon resources"
 ./scripts/remove-daemon.sh >/dev/null 2>&1 || true
 
 echo "[clean] remove runner jobs"
-kubectl delete jobs -n "${namespace}" -l app=claw-runner --ignore-not-found >/dev/null || true
+kctl delete jobs -n "${namespace}" -l app=claw-runner --ignore-not-found >/dev/null || true
 
 echo "[clean] remove runner pods"
-kubectl delete pods -n "${namespace}" -l app=claw-runner --ignore-not-found >/dev/null || true
+kctl delete pods -n "${namespace}" -l app=claw-runner --ignore-not-found >/dev/null || true
 
 echo "[clean] remove old local result artifacts"
 if [[ "${clean_results}" == "true" ]]; then

@@ -59,6 +59,8 @@ Use only these commands:
 3. `make bench-smoke` - cheap synthetic canary (expects `SMOKE_OK`).
 4. `make bench-run` - full clean end-to-end comparison run.
 5. `make bench-report` - collect + score + summary (`results/factory-summary.json`).
+6. `make smoke-each` - manual-first hello-world readiness report (`results/smoke-readiness.json`).
+7. `make smoke-one AGENT_NAME=<agent> SMOKE_PROVIDER=<provider>` - single-agent single-provider hello check.
 
 Optional helper commands:
 
@@ -86,6 +88,7 @@ Matrix notes:
 - Set `COMPARISON_MODE=full` to require all configured agents before running.
 - Use `make matrix-preflight` to run only the availability check.
 - To compare the full matrix, ensure every image in `config/agents.csv` is pullable from your environment.
+- `nemoclaw` is configured as `nemoclaw:latest` and may require building a local image from `https://github.com/NVIDIA/NemoClaw`.
 
 ## Daemon Mode (ZeroClaw)
 
@@ -103,8 +106,15 @@ Notes:
 
 ## Notes
 
+- `claw-secrets` should contain `openai_api_key`, `anthropic_api_key`, `llm_api_key`, and `github_token`.
+- Use `scripts/setup-secrets.sh` with `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` for mixed-provider runs.
+- `make smoke-one` is the recommended contract-debug path: it runs one job at a time and blocks on failures.
+
 - Use `k8s/templates/job-zeroclaw.yaml` when the default template fails due to stricter runtime assumptions.
 - OpenClaw uses `k8s/templates/job-openclaw.yaml` to align with its `openclaw agent --local` command contract.
+- NemoClaw uses `k8s/templates/job-nemoclaw.yaml` to force the configured provider/model before each run.
+- NanoClaw uses `k8s/templates/job-nanoclaw.yaml` to send the required stdin JSON payload to `/app/entrypoint.sh`.
+- PicoClaw uses `k8s/templates/job-picoclaw.yaml` to align with its `picoclaw agent -m` command contract.
 - The ZeroClaw template keeps non-root and dropped caps but allows writable root filesystem when required.
 - Logs are written to `results/*.txt` for post-run scoring and analysis.
 - Final comparison summary is written to `results/factory-summary.json`.
