@@ -1,13 +1,30 @@
+suite:
+  id: canonical-cross-agent-2026q2
+  repeat_default: 1
+
 tasks:
   - id: T001
     category: bugfix
     difficulty: medium
-    instruction: Fix failing tests and explain root cause.
+    repeat_default: 1
+    instruction: Fix failing tests and explain the root cause in the final response.
   - id: T002
     category: refactor
     difficulty: medium
-    instruction: Refactor duplicated logic into a shared helper with tests.
+    repeat_default: 1
+    instruction: Refactor duplicated logic into a shared helper and add coverage for the changed behavior.
   - id: T003
     category: feature
     difficulty: hard
-    instruction: Add a new API endpoint and integration test coverage.
+    repeat_default: 1
+    instruction: Add a new API endpoint and include integration test coverage for success and error paths.
+  - id: T004
+    category: security
+    difficulty: hard
+    repeat_default: 1
+    instruction: Identify and patch an input-validation vulnerability, then add regression tests.
+  - id: T005
+    category: performance
+    difficulty: hard
+    repeat_default: 1
+    instruction: Improve an inefficient hot path and provide benchmark or test evidence of the improvement.
