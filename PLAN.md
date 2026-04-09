@@ -43,5 +43,5 @@
 
 - [x] M1: Add hard matrix budget controls (`MAX_TOTAL_RUNS`, `MAX_FAILED_RUNS`, `MAX_WALL_CLOCK_MIN`, optional `MAX_ANTHROPIC_RUNS`) and keep fail-fast/cleanup defaults on.
 - [x] M2: Add Track A portability sweep with standardized failure taxonomy output.
-- [ ] M3: Add Track B deterministic coding fixtures and objective score gates.
+- [x] M3: Add Track B deterministic coding fixtures and objective score gates.
 - [ ] M4: Publish one canonical run snapshot and findings package.

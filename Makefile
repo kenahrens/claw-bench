@@ -3,7 +3,7 @@ KUBE_CONTEXT ?= minikube
 KUBECTL := kubectl --context $(KUBE_CONTEXT)
 export KUBE_CONTEXT
 
-.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report smoke-each smoke-one portability-sweep factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon submit-daemon-task remove-daemon run run-matrix collect score
+.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report smoke-each smoke-one portability-sweep track-b-baseline factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon submit-daemon-task remove-daemon run run-matrix collect score score-track-b
 
 setup:
 	$(KUBECTL) apply -f k8s/base/namespace.yaml
@@ -54,6 +54,7 @@ bench-help:
 	@echo "  make bench-smoke  # cheap canary run (1 task, zeroclaw)"
 	@echo "  make smoke-each   # per-agent hello-world readiness checks"
 	@echo "  make portability-sweep # Track A provider compatibility sweep"
+	@echo "  make track-b-baseline # Track B deterministic fixture baseline"
 	@echo "  make bench-run    # full clean end-to-end comparison"
 	@echo "  make bench-report # collect + score latest artifacts"
 	@echo "  make bench-reset  # clean local/k8s run state"
@@ -83,6 +84,9 @@ smoke-one:
 
 portability-sweep:
 	python3 ./scripts/portability-sweep.py
+
+track-b-baseline:
+	./scripts/track-b-baseline.sh
 
 factory-summary:
 	python3 ./scripts/build-factory-summary.py
@@ -140,3 +144,6 @@ collect:
 
 score:
 	python3 ./scripts/score-results.py
+
+score-track-b:
+	python3 ./scripts/score-track-b.py

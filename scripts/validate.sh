@@ -28,8 +28,9 @@ root = Path(".")
 agents_path = root / "config/agents.csv"
 caps_path = root / "config/agents-capabilities.csv"
 safety_path = root / "config/agents-safety.csv"
+track_b_fixtures_path = root / "config/track-b-fixtures.csv"
 
-for path in (agents_path, caps_path, safety_path):
+for path in (agents_path, caps_path, safety_path, track_b_fixtures_path):
     if not path.exists():
         raise SystemExit(f"error: missing required config file: {path}")
 
@@ -39,6 +40,8 @@ with caps_path.open(newline="", encoding="utf-8") as f:
     caps_rows = list(csv.DictReader(f))
 with safety_path.open(newline="", encoding="utf-8") as f:
     safety_rows = list(csv.DictReader(f))
+with track_b_fixtures_path.open(newline="", encoding="utf-8") as f:
+    track_b_rows = list(csv.DictReader(f))
 
 def agent_set(rows):
     return {r["agent"].strip() for r in rows if r.get("agent", "").strip()}
@@ -86,6 +89,30 @@ for row in safety_rows:
     if not cpu_request or not cpu_limit or not memory_request or not memory_limit:
         raise SystemExit(f"error: missing resource policy in agents-safety.csv for {agent}")
 
+required_track_b_tasks = {"B001", "B002", "B003"}
+configured_track_b_tasks = set()
+for row in track_b_rows:
+    task_id = row["task_id"].strip()
+    fixture_dir = row["fixture_dir"].strip()
+    public_check = row["public_check"].strip()
+    hidden_check = row["hidden_check"].strip()
+    quality_check = row["quality_check"].strip()
+
+    if not task_id:
+        raise SystemExit("error: empty task_id in config/track-b-fixtures.csv")
+    if task_id in configured_track_b_tasks:
+        raise SystemExit(f"error: duplicate task_id in config/track-b-fixtures.csv: {task_id}")
+    configured_track_b_tasks.add(task_id)
+
+    if not fixture_dir or not (root / fixture_dir).exists():
+        raise SystemExit(f"error: missing fixture_dir for {task_id}: {fixture_dir}")
+    if not public_check or not hidden_check or not quality_check:
+        raise SystemExit(f"error: missing checks in config/track-b-fixtures.csv for {task_id}")
+
+missing_track_b = required_track_b_tasks - configured_track_b_tasks
+if missing_track_b:
+    raise SystemExit(f"error: missing required Track B fixtures: {sorted(missing_track_b)}")
+
 for row in agents_rows:
     env = os.environ.copy()
     env.update(
@@ -109,6 +136,12 @@ echo "[validate] tasks file"
 task_count="$(awk '/^[[:space:]]*-[[:space:]]id:/{count++} END{print count+0}' tasks/tasks.yaml)"
 if [[ "${task_count}" -lt 1 ]]; then
   echo "error: no tasks found in tasks/tasks.yaml" >&2
+  exit 1
+fi
+
+track_b_task_count="$(awk '/^[[:space:]]*-[[:space:]]id:/{count++} END{print count+0}' tasks/track-b-tasks.yaml)"
+if [[ "${track_b_task_count}" -lt 1 ]]; then
+  echo "error: no tasks found in tasks/track-b-tasks.yaml" >&2
   exit 1
 fi
 

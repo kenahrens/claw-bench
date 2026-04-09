@@ -4,6 +4,7 @@ set -euo pipefail
 task_ref="${TASK_REF:-}"
 task_id="${TASK_ID:-}"
 task_instruction="${TASK_INSTRUCTION:-}"
+tasks_file="${TASKS_FILE:-tasks/tasks.yaml}"
 
 if [[ -n "${task_id}" || -n "${task_instruction}" ]]; then
   if [[ -z "${task_id}" || -z "${task_instruction}" ]]; then
@@ -26,11 +27,11 @@ mapfile -t task_rows < <(
       sub(/^[^:]*:[[:space:]]*/, "", line)
       print id "\t" line
     }
-  ' tasks/tasks.yaml
+  ' "${tasks_file}"
 )
 
 if [[ "${#task_rows[@]}" -eq 0 ]]; then
-  echo "error: no tasks found in tasks/tasks.yaml" >&2
+  echo "error: no tasks found in ${tasks_file}" >&2
   exit 1
 fi
 
@@ -56,7 +57,7 @@ if [[ -n "${task_ref}" ]]; then
       fi
     done
     if [[ "${found}" != "true" ]]; then
-      echo "error: TASK_REF must be TASK_<n> or a task id from tasks/tasks.yaml" >&2
+      echo "error: TASK_REF must be TASK_<n> or a task id from ${tasks_file}" >&2
       exit 1
     fi
   fi
