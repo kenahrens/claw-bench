@@ -1,4 +1,4 @@
-# claw-off-bench
+# claw-bench
 
 Kubernetes-first benchmark harness for the 2026 Claw runtime evaluation.
 
@@ -10,7 +10,7 @@ Run a standardized autonomous-coding benchmark across the configured Claw runtim
 - Density
 - Security
 
-All runs execute with the same hard limits (`1 CPU`, `512Mi` memory), non-root security context, and network egress restrictions.
+Runs use per-agent safety limits from `config/agents-safety.csv`, non-root security context, and network egress restrictions.
 
 ## Evaluation Matrix
 
@@ -81,11 +81,15 @@ Use these only when you need lower-level control:
 Matrix notes:
 
 - `scripts/run-matrix.sh` performs image preflight and writes `results/matrix-preflight.tsv`.
+- `scripts/run-matrix.sh` defaults to a fast lane (`TASK_FILTER=T001,T002`, `FAIL_FAST=true`) for quicker iteration.
 - `scripts/preflight-gate.sh` enforces credentials/image readiness for the selected comparison mode before matrix execution.
 - `make doctor` prints blockers for a full-matrix run before execution.
 - Unavailable agents are skipped by default so available agents still run.
 - Set `MATRIX_STRICT=true` to fail when any configured agent is unavailable.
 - Set `COMPARISON_MODE=full` to require all configured agents before running.
+- Set `TASK_FILTER=` (empty) to run all tasks, or provide a list like `TASK_FILTER=T001,T002,T003`.
+- Set `FAIL_FAST=false` only when you intentionally want to continue after failures.
+- Timed-out runs are cleaned up automatically by default (`CLEANUP_ON_TIMEOUT=true`).
 - Use `make matrix-preflight` to run only the availability check.
 - To compare the full matrix, ensure every image in `config/agents.csv` is pullable from your environment.
 - `nemoclaw` is configured as `nemoclaw:latest` and may require building a local image from `https://github.com/NVIDIA/NemoClaw`.
