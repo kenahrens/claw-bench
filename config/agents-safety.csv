@@ -1,6 +1,6 @@
 agent,wait_timeout,max_tool_iterations,approval_mode,cpu_request,cpu_limit,memory_request,memory_limit,notes
-openclaw,20m,,default,1,1,1Gi,2Gi,OpenClaw needs higher memory headroom to avoid Node OOM.
-nemoclaw,20m,,default,1,1,1Gi,2Gi,NemoClaw inherits OpenClaw memory profile plus sandbox overhead.
-zeroclaw,12m,30,default,1,1,512Mi,512Mi,Limit tool iterations and enforce runtime timeout.
-nanoclaw,20m,,default,1,1,512Mi,512Mi,Use benchmark-default resources.
-picoclaw,20m,,default,1,1,512Mi,512Mi,Use benchmark-default resources.
+openclaw,10m,,default,750m,1,768Mi,1536Mi,Lower memory footprint while preserving OpenClaw stability.
+nemoclaw,10m,,default,750m,1,768Mi,1536Mi,Lower memory footprint while preserving NemoClaw stability.
+zeroclaw,8m,30,default,500m,1,384Mi,512Mi,Tighter timeout and lower resource baseline.
+nanoclaw,12m,,default,500m,1,384Mi,512Mi,Reduce baseline memory and cap long-running jobs sooner.
+picoclaw,10m,,default,500m,1,384Mi,512Mi,Reduce baseline memory and timeout for faster iteration.

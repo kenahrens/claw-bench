@@ -13,6 +13,10 @@ matrix_strict="${MATRIX_STRICT:-false}"
 preflight_only="${PREFLIGHT_ONLY:-false}"
 matrix_default_provider="${DEFAULT_PROVIDER:-openai}"
 matrix_default_model="${DEFAULT_MODEL:-gpt-4o-mini}"
+task_filter="${TASK_FILTER:-T001,T002}"
+fail_fast="${FAIL_FAST:-true}"
+cleanup_on_timeout="${CLEANUP_ON_TIMEOUT:-true}"
+auto_clean_runners="${AUTO_CLEAN_RUNNERS:-true}"
 
 if [[ ! -f "${matrix_file}" ]]; then
   echo "error: agent matrix file not found: ${matrix_file}" >&2
@@ -39,6 +43,26 @@ if ! [[ "${preflight_only}" =~ ^(true|false)$ ]]; then
   exit 1
 fi
 
+if ! [[ "${fail_fast}" =~ ^(true|false)$ ]]; then
+  echo "error: FAIL_FAST must be true or false" >&2
+  exit 1
+fi
+
+if ! [[ "${cleanup_on_timeout}" =~ ^(true|false)$ ]]; then
+  echo "error: CLEANUP_ON_TIMEOUT must be true or false" >&2
+  exit 1
+fi
+
+if ! [[ "${auto_clean_runners}" =~ ^(true|false)$ ]]; then
+  echo "error: AUTO_CLEAN_RUNNERS must be true or false" >&2
+  exit 1
+fi
+
+if [[ "${auto_clean_runners}" == "true" ]]; then
+  kctl delete jobs -n claw-bench -l app=claw-runner --ignore-not-found >/dev/null || true
+  kctl delete pods -n claw-bench -l app=claw-runner --ignore-not-found >/dev/null || true
+fi
+
 if command -v minikube >/dev/null 2>&1 && [[ "$(kctl config current-context 2>/dev/null || true)" == "minikube" ]]; then
   eval "$(minikube docker-env)"
 fi
@@ -61,6 +85,24 @@ if [[ "${#task_rows[@]}" -eq 0 ]]; then
   echo "error: no tasks found in tasks/tasks.yaml" >&2
   exit 1
 fi
+
+if [[ -n "${task_filter}" ]]; then
+  filtered_task_rows=()
+  for task_row in "${task_rows[@]}"; do
+    task_id="${task_row%%$'\t'*}"
+    if [[ ",${task_filter}," == *",${task_id},"* ]]; then
+      filtered_task_rows+=("${task_row}")
+    fi
+  done
+  task_rows=("${filtered_task_rows[@]}")
+fi
+
+if [[ "${#task_rows[@]}" -eq 0 ]]; then
+  echo "error: no tasks selected after applying TASK_FILTER=${task_filter}" >&2
+  exit 1
+fi
+
+echo "matrix defaults: provider=${matrix_default_provider} model=${matrix_default_model} tasks=${task_filter} fail_fast=${fail_fast}"
 
 mkdir -p results
 preflight_report="results/matrix-preflight.tsv"
@@ -186,6 +228,7 @@ for row in "${available_rows[@]}"; do
         DEFAULT_PROVIDER="${matrix_default_provider}" \
         DEFAULT_MODEL="${matrix_default_model}" \
         VALIDATE_RESULT=true \
+        CLEANUP_ON_TIMEOUT="${cleanup_on_timeout}" \
         WAIT_TIMEOUT="${agent_wait_timeout}" \
         MAX_TOOL_ITERATIONS="${agent_max_tool_iterations}" \
         APPROVAL_MODE="${agent_approval_mode}" \
@@ -198,6 +241,11 @@ for row in "${available_rows[@]}"; do
         ./scripts/run-task.sh; then
         failures=$((failures + 1))
         echo "failed: ${agent} ${run_task_id}" >&2
+        if [[ "${fail_fast}" == "true" ]]; then
+          echo "error: stopping early because FAIL_FAST=true" >&2
+          echo "completed with ${failures} failed runs" >&2
+          exit 1
+        fi
       fi
     done
   done

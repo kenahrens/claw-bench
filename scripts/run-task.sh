@@ -8,6 +8,7 @@ source "${script_dir}/lib/kube.sh"
 wait_timeout="${WAIT_TIMEOUT:-30m}"
 require_github_token="${REQUIRE_GITHUB_TOKEN:-false}"
 validate_result="${VALIDATE_RESULT:-false}"
+cleanup_on_timeout="${CLEANUP_ON_TIMEOUT:-true}"
 
 IFS=$'\t' read -r resolved_task_id resolved_task_instruction < <(
   TASK_REF="${TASK_REF:-}" TASK_ID="${TASK_ID:-}" TASK_INSTRUCTION="${TASK_INSTRUCTION:-}" ./scripts/resolve-task.sh
@@ -37,8 +38,21 @@ manifest="$(./scripts/render-job.sh)"
 job_name="$(printf '%s\n' "${manifest}" | awk '/^  name:/ {print $2; exit}')"
 
 printf '%s\n' "${manifest}" | kctl apply -f -
-kctl wait --for=condition=complete --timeout="${wait_timeout}" "job/${job_name}" -n claw-bench || true
+timed_out="false"
+if ! kctl wait --for=condition=complete --timeout="${wait_timeout}" "job/${job_name}" -n claw-bench; then
+  timed_out="true"
+fi
 kctl logs "job/${job_name}" -n claw-bench --timestamps | tee "results/${job_name}.txt"
+
+if [[ "${timed_out}" == "true" ]]; then
+  echo "error: job ${job_name} timed out after ${wait_timeout}" >&2
+  if [[ "${cleanup_on_timeout}" == "true" ]]; then
+    echo "[run-task] cleanup timed-out job ${job_name}" >&2
+    kctl delete job "${job_name}" -n claw-bench --ignore-not-found >/dev/null || true
+    kctl delete pods -n claw-bench -l job-name="${job_name}" --ignore-not-found >/dev/null || true
+  fi
+  exit 1
+fi
 
 if [[ "${validate_result}" == "true" ]]; then
   if ! RUN_LOG_PATH="results/${job_name}.txt" python3 - <<'PY'
