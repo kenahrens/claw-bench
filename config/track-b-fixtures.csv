@@ -1,0 +1,4 @@
+task_id,fixture_dir,public_check,hidden_check,quality_check
+B001,tasks/fixtures/b001_stats_bugfix,python3 -m unittest discover -s tests -q,python3 -m unittest discover -s hidden_tests -q,python3 -m py_compile src/stats.py
+B002,tasks/fixtures/b002_refactor_parser,python3 -m unittest discover -s tests -q,python3 -m unittest discover -s hidden_tests -q,python3 -m py_compile src/parser.py
+B003,tasks/fixtures/b003_security_validation,python3 -m unittest discover -s tests -q,python3 -m unittest discover -s hidden_tests -q,python3 -m py_compile src/validation.py

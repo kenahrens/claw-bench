@@ -62,12 +62,14 @@ Use only these commands:
 6. `make smoke-each` - manual-first hello-world readiness report (`results/smoke-readiness.json`).
 7. `make smoke-one AGENT_NAME=<agent> SMOKE_PROVIDER=<provider>` - single-agent single-provider hello check.
 8. `make portability-sweep` - Track A compatibility sweep with taxonomy output (`results/portability-sweep.tsv`, `results/portability-sweep.json`).
+9. `make track-b-baseline` - Track B deterministic fixture baseline with objective gates (`results/track-b-summary.json`).
 
 Optional helper commands:
 
 - `make bench-help` - print the simple command set.
 - `make bench-reset` - clean run state without running a benchmark.
 - `PORTABILITY_PROVIDERS=openai,anthropic make portability-sweep` to choose provider lanes.
+- `TASKS_FILE=tasks/track-b-tasks.yaml TRACK_B_EVAL=true make run-matrix` for direct Track B matrix execution.
 
 That is the intended user interface. Everything else is internal/advanced.
 
@@ -90,9 +92,11 @@ Matrix notes:
 - Set `MATRIX_STRICT=true` to fail when any configured agent is unavailable.
 - Set `COMPARISON_MODE=full` to require all configured agents before running.
 - Set `TASK_FILTER=` (empty) to run all tasks, or provide a list like `TASK_FILTER=T001,T002,T003`.
+- Override task source with `TASKS_FILE=...` (default `tasks/tasks.yaml`), e.g. `tasks/track-b-tasks.yaml`.
 - Set `FAIL_FAST=false` only when you intentionally want to continue after failures.
 - Timed-out runs are cleaned up automatically by default (`CLEANUP_ON_TIMEOUT=true`).
 - Budget guardrails are enforced when set: `MAX_TOTAL_RUNS`, `MAX_FAILED_RUNS`, `MAX_WALL_CLOCK_MIN`, `MAX_ANTHROPIC_RUNS` (`0` disables a guardrail).
+- Enable deterministic Track B score gates with `TRACK_B_EVAL=true`; each run writes `results/<job>-trackb-eval.json`.
 - Use `make matrix-preflight` to run only the availability check.
 - To compare the full matrix, ensure every image in `config/agents.csv` is pullable from your environment.
 - `nemoclaw` is configured as `nemoclaw:latest` and may require building a local image from `https://github.com/NVIDIA/NemoClaw`.
@@ -125,6 +129,7 @@ Notes:
 - The ZeroClaw template keeps non-root and dropped caps but allows writable root filesystem when required.
 - Logs are written to `results/*.txt` for post-run scoring and analysis.
 - Final comparison summary is written to `results/factory-summary.json`.
+- Track B fixture mapping lives in `config/track-b-fixtures.csv` and deterministic fixture tasks live in `tasks/track-b-tasks.yaml`.
 
 ## Strategy Reset (Next)
 

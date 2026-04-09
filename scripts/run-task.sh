@@ -9,6 +9,7 @@ wait_timeout="${WAIT_TIMEOUT:-30m}"
 require_github_token="${REQUIRE_GITHUB_TOKEN:-false}"
 validate_result="${VALIDATE_RESULT:-false}"
 cleanup_on_timeout="${CLEANUP_ON_TIMEOUT:-true}"
+track_b_eval="${TRACK_B_EVAL:-false}"
 
 IFS=$'\t' read -r resolved_task_id resolved_task_instruction < <(
   TASK_REF="${TASK_REF:-}" TASK_ID="${TASK_ID:-}" TASK_INSTRUCTION="${TASK_INSTRUCTION:-}" ./scripts/resolve-task.sh
@@ -54,6 +55,11 @@ if [[ "${timed_out}" == "true" ]]; then
   exit 1
 fi
 
+if ! [[ "${track_b_eval}" =~ ^(true|false)$ ]]; then
+  echo "error: TRACK_B_EVAL must be true or false" >&2
+  exit 1
+fi
+
 if [[ "${validate_result}" == "true" ]]; then
   if ! RUN_LOG_PATH="results/${job_name}.txt" python3 - <<'PY'
 import os
@@ -85,6 +91,13 @@ sys.exit(0)
 PY
   then
     echo "error: result validation failed for ${job_name}" >&2
+    exit 1
+  fi
+fi
+
+if [[ "${track_b_eval}" == "true" ]]; then
+  if ! JOB_NAME="${job_name}" TASK_ID="${TASK_ID}" ./scripts/evaluate-track-b.sh; then
+    echo "error: Track B evaluation gate failed for ${job_name}" >&2
     exit 1
   fi
 fi

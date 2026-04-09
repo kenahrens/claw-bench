@@ -14,6 +14,7 @@ preflight_only="${PREFLIGHT_ONLY:-false}"
 matrix_default_provider="${DEFAULT_PROVIDER:-openai}"
 matrix_default_model="${DEFAULT_MODEL:-gpt-4o-mini}"
 task_filter="${TASK_FILTER:-T001,T002}"
+tasks_file="${TASKS_FILE:-tasks/tasks.yaml}"
 fail_fast="${FAIL_FAST:-true}"
 cleanup_on_timeout="${CLEANUP_ON_TIMEOUT:-true}"
 auto_clean_runners="${AUTO_CLEAN_RUNNERS:-true}"
@@ -33,6 +34,11 @@ fi
 
 if [[ ! -f "${safety_file}" ]]; then
   echo "error: agent safety file not found: ${safety_file}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${tasks_file}" ]]; then
+  echo "error: tasks file not found: ${tasks_file}" >&2
   exit 1
 fi
 
@@ -106,11 +112,11 @@ mapfile -t task_rows < <(
       sub(/^[^:]*:[[:space:]]*/, "", line)
       print id "\t" line
     }
-  ' tasks/tasks.yaml
+  ' "${tasks_file}"
 )
 
 if [[ "${#task_rows[@]}" -eq 0 ]]; then
-  echo "error: no tasks found in tasks/tasks.yaml" >&2
+  echo "error: no tasks found in ${tasks_file}" >&2
   exit 1
 fi
 
