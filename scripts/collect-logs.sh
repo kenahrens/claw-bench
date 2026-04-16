@@ -7,7 +7,6 @@ source "${script_dir}/lib/kube.sh"
 
 mkdir -p results/raw
 
-collect_selector="${COLLECT_LABEL_SELECTOR:-app=claw-runner}"
 collect_request_timeout="${COLLECT_REQUEST_TIMEOUT:-20s}"
 
 if ! [[ "${collect_request_timeout}" =~ ^[0-9]+s$ ]]; then
@@ -15,19 +14,27 @@ if ! [[ "${collect_request_timeout}" =~ ^[0-9]+s$ ]]; then
   exit 1
 fi
 
-jobs="$(kctl get jobs -n claw-bench -l "${collect_selector}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')"
-if [[ -z "${jobs}" ]]; then
-  echo "no jobs found in claw-bench namespace for selector ${collect_selector}"
+# Collect logs from all daemon deployments
+daemon_names="$(kctl get deployments -n claw-bench -l claw.mode=daemon -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
+
+if [[ -z "${daemon_names}" ]]; then
+  echo "no daemon deployments found in claw-bench namespace"
   exit 0
 fi
 
-while IFS= read -r job; do
-  [[ -z "${job}" ]] && continue
-  out_file="results/raw/${job}.txt"
-  if [[ -f "${out_file}" ]]; then
+while IFS= read -r daemon_name; do
+  [[ -z "${daemon_name}" ]] && continue
+
+  pod_name="$(kctl get pods -n claw-bench -l app="${daemon_name}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -z "${pod_name}" ]]; then
     continue
   fi
-  kctl logs "job/${job}" -n claw-bench --timestamps --pod-running-timeout=10s --request-timeout="${collect_request_timeout}" > "${out_file}" 2>/dev/null || true
-done <<< "${jobs}"
+
+  # Stream recent logs from the daemon pod (last task run)
+  # Daemon pods run tail -f /dev/null normally; logs come from kubectl exec sessions
+  # which are captured by submit-daemon-task.sh, so this is a fallback
+  out_file="results/raw/${daemon_name}-pod-logs.txt"
+  kctl logs "${pod_name}" -n claw-bench --timestamps --tail=1000 --request-timeout="${collect_request_timeout}" > "${out_file}" 2>/dev/null || true
+done <<< "${daemon_names}"
 
 echo "collected logs under results/raw/"

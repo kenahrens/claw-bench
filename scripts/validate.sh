@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "[validate] shell syntax"
-bash -n scripts/*.sh
+bash -n scripts/*.sh scripts/agents/*.sh
 
 echo "[validate] python syntax"
 python3 - <<'PY'
@@ -61,15 +61,17 @@ if agents != safety:
 
 for row in agents_rows:
     agent = row["agent"].strip()
-    template = row["template"].strip()
     image = row["image"].strip()
     agent_bin = row["bin"].strip()
-    if not template or not Path(template).exists():
-        raise SystemExit(f"error: invalid template for {agent}: {template}")
     if not image:
         raise SystemExit(f"error: missing image for {agent}")
     if not agent_bin:
         raise SystemExit(f"error: missing bin for {agent}")
+
+    # Check that agent runner script exists
+    runner_path = root / "scripts" / "agents" / f"{agent}.sh"
+    if not runner_path.exists():
+        raise SystemExit(f"error: missing agent runner script for {agent}: {runner_path}")
 
 for row in safety_rows:
     agent = row["agent"].strip()
@@ -113,21 +115,32 @@ missing_track_b = required_track_b_tasks - configured_track_b_tasks
 if missing_track_b:
     raise SystemExit(f"error: missing required Track B fixtures: {sorted(missing_track_b)}")
 
+# Validate deployment template renders for each agent
 for row in agents_rows:
+    agent = row["agent"].strip()
+    image = row["image"].strip()
     env = os.environ.copy()
-    env.update(
-        {
-            "AGENT_NAME": row["agent"].strip(),
-            "AGENT_IMAGE": row["image"].strip(),
-            "AGENT_TEMPLATE": row["template"].strip(),
-            "AGENT_BIN": row["bin"].strip(),
-            "TASK_ID": "VALIDATE",
-            "TASK_INSTRUCTION": "Validation canary",
-        }
+    env.update({
+        "AGENT_NAME": agent,
+        "AGENT_IMAGE": image,
+        "DAEMON_NAME": f"{agent}-daemon",
+        "AGENT_HOME": "/home/node",
+        "DAEMON_PORT": "8787",
+        "DEFAULT_PROVIDER": "openai",
+        "DEFAULT_MODEL": "gpt-5-mini",
+        "MAX_TOOL_ITERATIONS": "40",
+        "APPROVAL_MODE": "default",
+        "RESOURCE_CPU_REQUEST": "1",
+        "RESOURCE_CPU_LIMIT": "1",
+        "RESOURCE_MEMORY_REQUEST": "512Mi",
+        "RESOURCE_MEMORY_LIMIT": "512Mi",
+    })
+    proc = subprocess.run(
+        ["envsubst", "k8s/templates/deployment-agent.yaml"],
+        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
     )
-    proc = subprocess.run(["./scripts/render-job.sh"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     if proc.returncode != 0:
-        raise SystemExit(f"error: render-job failed for {row['agent'].strip()}: {proc.stderr.strip()}")
+        raise SystemExit(f"error: deployment template render failed for {agent}: {proc.stderr.strip()}")
 
 print("config integrity ok")
 PY

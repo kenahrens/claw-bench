@@ -1,41 +1,54 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: ${JOB_NAME}
+  name: ${DAEMON_NAME}
   namespace: claw-bench
   annotations:
     ebpf.speedscale.com/capture: "true"
   labels:
+    app: ${DAEMON_NAME}
     claw.agent: ${AGENT_NAME}
-    claw.task: ${TASK_ID}
+    claw.mode: daemon
 spec:
-  backoffLimit: 0
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${DAEMON_NAME}
   template:
     metadata:
       annotations:
         ebpf.speedscale.com/capture: "true"
       labels:
-        app: claw-runner
+        app: ${DAEMON_NAME}
         claw.agent: ${AGENT_NAME}
-        claw.task: ${TASK_ID}
+        claw.mode: daemon
     spec:
-      restartPolicy: Never
+      restartPolicy: Always
       containers:
         - name: agent
           image: ${AGENT_IMAGE}
           imagePullPolicy: IfNotPresent
           workingDir: /workspace
-          command: ["sh", "-lc", "/workspace/scripts/run-picoclaw-once.sh"]
+          command: ["sh", "-c", "tail -f /dev/null"]
           env:
             - name: HOME
-              value: /home/picoclaw
-            - name: TASK_PROMPT
-              value: "${TASK_INSTRUCTION}"
-            - name: DEFAULT_PROVIDER
-              value: "${DEFAULT_PROVIDER}"
-            - name: DEFAULT_MODEL
-              value: "${DEFAULT_MODEL}"
+              value: ${AGENT_HOME}
             - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: claw-secrets
+                  key: llm_api_key
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: claw-secrets
+                  key: llm_api_key
+            - name: ZEROCLAW_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: claw-secrets
+                  key: llm_api_key
+            - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
@@ -45,16 +58,28 @@ spec:
                 secretKeyRef:
                   name: claw-secrets
                   key: openai_api_key
-            - name: OPENROUTER_API_KEY
+            - name: ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
-                  key: openai_api_key
+                  key: anthropic_api_key
             - name: GITHUB_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: claw-secrets
                   key: github_token
+            - name: DEFAULT_PROVIDER
+              value: "${DEFAULT_PROVIDER}"
+            - name: DEFAULT_MODEL
+              value: "${DEFAULT_MODEL}"
+            - name: ZEROCLAW_DEFAULT_PROVIDER
+              value: "${DEFAULT_PROVIDER}"
+            - name: ZEROCLAW_DEFAULT_MODEL
+              value: "${DEFAULT_MODEL}"
+            - name: ZEROCLAW_MAX_TOOL_ITERATIONS
+              value: "${MAX_TOOL_ITERATIONS}"
+            - name: ZEROCLAW_APPROVAL_MODE
+              value: "${APPROVAL_MODE}"
           resources:
             requests:
               cpu: "${RESOURCE_CPU_REQUEST}"
@@ -76,9 +101,13 @@ spec:
               mountPath: /workspace
             - name: tmp
               mountPath: /tmp
+            - name: home
+              mountPath: ${AGENT_HOME}
       volumes:
         - name: workspace
           persistentVolumeClaim:
             claimName: claw-workspace
         - name: tmp
+          emptyDir: {}
+        - name: home
           emptyDir: {}

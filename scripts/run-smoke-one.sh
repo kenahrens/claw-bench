@@ -42,7 +42,7 @@ if [[ "${agent_name}" == "openclaw" ]]; then
   resource_memory_limit="${resource_memory_limit:-2Gi}"
 fi
 
-IFS=$'\t' read -r agent_image agent_template agent_bin < <(
+IFS=$'\t' read -r agent_image agent_bin < <(
   AGENT_NAME_LOOKUP="${agent_name}" python3 - <<'PY'
 import csv
 import os
@@ -52,7 +52,7 @@ agent = os.environ["AGENT_NAME_LOOKUP"]
 with open("config/agents.csv", newline="", encoding="utf-8") as f:
     for row in csv.DictReader(f):
         if row["agent"].strip() == agent:
-            print("\t".join([row["image"].strip(), row["template"].strip(), row["bin"].strip()]))
+            print("\t".join([row["image"].strip(), row["bin"].strip()]))
             sys.exit(0)
 print(f"agent '{agent}' not found in config/agents.csv", file=sys.stderr)
 sys.exit(1)
@@ -63,13 +63,11 @@ echo "[smoke-one] agent=${agent_name} provider=${provider} model=${model}"
 
 REQUIRE_OPENAI_KEY="${require_openai_key}" REQUIRE_ANTHROPIC_KEY="${require_anthropic_key}" ./scripts/check-cluster-secrets.sh
 
-kctl delete jobs -n claw-bench -l app=claw-runner --ignore-not-found >/dev/null || true
-kctl delete pods -n claw-bench -l app=claw-runner --ignore-not-found >/dev/null || true
+# Remove any existing daemon for this agent
+kctl delete deployments -n claw-bench -l claw.mode=daemon --ignore-not-found >/dev/null 2>&1 || true
 
 AGENT_NAME="${agent_name}" \
 AGENT_IMAGE="${agent_image}" \
-AGENT_TEMPLATE="${agent_template}" \
-AGENT_BIN="${agent_bin}" \
 DEFAULT_PROVIDER="${provider}" \
 DEFAULT_MODEL="${model}" \
 RESOURCE_MEMORY_REQUEST="${resource_memory_request}" \

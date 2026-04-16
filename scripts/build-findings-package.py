@@ -168,7 +168,7 @@ def summarize_factory(factory_payload):
             {
                 "track": "A",
                 "subject": agent.get("agent", ""),
-                "lane": "job",
+                "lane": "daemon",
                 "runs": job.get("runs", 0),
                 "success_rate_percent": job.get("success_rate", 0.0),
                 "median_duration_seconds": job.get("median_duration_seconds", ""),
@@ -187,13 +187,11 @@ def summarize_score(score_payload):
         return rows
 
     for item in score_payload.get("summary", []):
-        if item.get("mode") != "job":
-            continue
         rows.append(
             {
                 "track": "A",
                 "subject": item.get("agent", ""),
-                "lane": "job",
+                "lane": "daemon",
                 "runs": item.get("runs", 0),
                 "success_rate_percent": item.get("success_rate", 0.0),
                 "median_duration_seconds": item.get("median_duration_seconds", ""),

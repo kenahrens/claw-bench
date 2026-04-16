@@ -52,7 +52,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: claw-runner
+      claw.mode: daemon
   policyTypes:
     - Egress
   egress:

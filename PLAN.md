@@ -53,3 +53,27 @@
 - [x] Add SpeedScale eBPF capture annotations to all K8s job and deployment templates.
 - [x] Add SpeedScale forwarder namespace to egress allowlist policy.
 - [x] Fix log collection to skip SpeedScale sidecar containers (stdin pipe for robustness).
+
+## Jobs-to-Deployments Conversion
+
+- [x] Convert all agents from Kubernetes Jobs to long-lived Deployments (daemon-only mode).
+- [x] Create generic Deployment template (`k8s/templates/deployment-agent.yaml`) with `tail -f /dev/null` entrypoint.
+- [x] Create per-agent task runner scripts (`scripts/agents/`) invoked via `kubectl exec`.
+- [x] Generalize `deploy-daemon.sh` to support all agents (not just ZeroClaw).
+- [x] Generalize `submit-daemon-task.sh` for kubectl exec task submission.
+- [x] Rewrite `run-task.sh` for daemon/Deployment mode (auto-deploy + submit task).
+- [x] Rewrite `run-matrix.sh` for daemon mode (deploy daemons per agent, submit tasks).
+- [x] Update `easy-button.sh` for daemon-only mode (remove EASY_MODE=job option).
+- [x] Update `collect-logs.sh` to collect from daemon pods instead of Job pods.
+- [x] Update `clean-bench.sh` to clean daemon deployments instead of Jobs.
+- [x] Update `score-results.py` for daemon log patterns and TASK_COMPLETE marker.
+- [x] Update `smoke-each.py` and `run-smoke-one.sh` for daemon mode.
+- [x] Update `validate.sh` to check agent runner scripts and Deployment template.
+- [x] Update `apply-egress-policy.sh` to target `claw.mode=daemon` label.
+- [x] Update `build-findings-package.py` to use daemon mode instead of job mode.
+- [x] Remove `config/agents.csv` template column (no longer needed).
+- [x] Remove `EASY_MODE` from `config/eval.env` (daemon-only).
+- [x] Delete all Job templates and `render-job.sh`.
+- [x] Delete old zeroclaw-specific Deployment/Service templates.
+- [x] Update Makefile (remove submit-daemon-task target, add daemon cleanup to bench-smoke).
+- [x] Update README.md and PLAN.md documentation.

@@ -1,23 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mode="${EASY_MODE:-job}"
 task_ref="${TASK_REF:-TASK_1}"
 agent_name="${AGENT_NAME:-zeroclaw}"
 agent_image="${AGENT_IMAGE:-zeroclaw-adapter:latest}"
 default_provider="${DEFAULT_PROVIDER:-openai}"
 default_model="${DEFAULT_MODEL:-gpt-5-mini}"
 wait_timeout="${WAIT_TIMEOUT:-120s}"
-
-if [[ "${mode}" != "job" && "${mode}" != "daemon" ]]; then
-  echo "error: EASY_MODE must be 'job' or 'daemon'" >&2
-  exit 1
-fi
-
-if [[ "${agent_name}" != "zeroclaw" ]]; then
-  echo "error: easy-button currently supports AGENT_NAME=zeroclaw only" >&2
-  exit 1
-fi
 
 if [[ -z "${LLM_API_KEY:-}" && -n "${OPENROUTER_API_KEY:-}" ]]; then
   export LLM_API_KEY="${OPENROUTER_API_KEY}"
@@ -46,15 +35,18 @@ make sync-workspace
 echo "[easy] apply egress policy"
 make setup-egress
 
-echo "[easy] build zeroclaw adapter"
-make build-zeroclaw-adapter
-
-if [[ "${mode}" == "job" ]]; then
-  echo "[easy] run ${task_ref} in job mode"
-  REQUIRE_GITHUB_TOKEN=false WAIT_TIMEOUT="${wait_timeout}" TASK_REF="${task_ref}" AGENT_NAME="${agent_name}" AGENT_IMAGE="${agent_image}" ./scripts/run-task.sh
-else
-  echo "[easy] run ${task_ref} in daemon mode"
-  make remove-daemon
-  DAEMON_NAME=zeroclaw-daemon AGENT_IMAGE="${agent_image}" DEFAULT_PROVIDER="${default_provider}" DEFAULT_MODEL="${default_model}" make deploy-daemon
-  TASK_REF="${task_ref}" ./scripts/submit-daemon-task.sh
+if [[ "${agent_name}" == "zeroclaw" ]]; then
+  echo "[easy] build zeroclaw adapter"
+  make build-zeroclaw-adapter
+elif [[ "${agent_name}" == "picoclaw" ]]; then
+  echo "[easy] build picoclaw symbols image"
+  make build-picoclaw-symbols
 fi
+
+echo "[easy] run ${task_ref} on ${agent_name} (daemon mode)"
+REQUIRE_GITHUB_TOKEN=false \
+WAIT_TIMEOUT="${wait_timeout}" \
+TASK_REF="${task_ref}" \
+AGENT_NAME="${agent_name}" \
+AGENT_IMAGE="${agent_image}" \
+./scripts/run-task.sh
