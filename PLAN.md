@@ -45,3 +45,11 @@
 - [x] M2: Add Track A portability sweep with standardized failure taxonomy output.
 - [x] M3: Add Track B deterministic coding fixtures and objective score gates.
 - [x] M4: Publish one canonical run snapshot and findings package.
+
+## Observability and Adapter Integration
+
+- [x] Add PicoClaw adapter Dockerfile with symbol-enabled build (golang:1.25-bookworm).
+- [x] Rename picoclaw image to `picoclaw-symbols:latest` and integrate build into Makefile, factory.sh, and bootstrap.
+- [x] Add SpeedScale eBPF capture annotations to all K8s job and deployment templates.
+- [x] Add SpeedScale forwarder namespace to egress allowlist policy.
+- [x] Fix log collection to skip SpeedScale sidecar containers (stdin pipe for robustness).

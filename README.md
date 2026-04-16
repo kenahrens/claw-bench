@@ -27,6 +27,7 @@ The benchmark matrix is tracked in `config/agents.csv`.
 - `k8s/templates`: generic and ZeroClaw-compatible Job manifests.
 - `scripts`: setup, policy generation, run orchestration, and log collection.
 - `adapters/zeroclaw`: optional adapter image for restrictive runtime behavior.
+- `adapters/picoclaw`: optional adapter image with symbol-enabled build for PicoClaw.
 
 ## Security and Isolation
 
@@ -39,6 +40,8 @@ The benchmark matrix is tracked in `config/agents.csv`.
 - `github.com`
 - `api.github.com`
 - Optional: `pypi.org` and `registry.npmjs.org` when `ALLOW_PACKAGE_REGISTRIES=true`
+
+The policy also allows egress to the SpeedScale forwarder in the `speedscale` namespace for observability.
 
 The policy resolves current A records and restricts agent pods (`app=claw-runner`) to DNS + HTTPS on allowlisted destinations.
 
@@ -104,7 +107,7 @@ Matrix notes:
 - Track B enforces edit policy: only `src/` may change; edits to `tests/` or `hidden_tests/` are classified as `contract mismatch`.
 - Set `TRACK_B_RESET_WORKSPACE=true` to re-sync the workspace before every run (enabled by default in `make track-b-baseline`).
 - Use `make matrix-preflight` to run only the availability check.
-- To compare the full matrix, ensure every image in `config/agents.csv` is pullable from your environment.
+- To compare the full matrix, ensure every image in `config/agents.csv` is pullable from your environment. Note: `picoclaw-symbols:latest` and `zeroclaw-adapter:latest` are built locally (via `make build-picoclaw-symbols` / `make build-zeroclaw-adapter`); other agent images are pulled from remote registries.
 - `nemoclaw` is configured as `nemoclaw:latest` and may require building a local image from `https://github.com/NVIDIA/NemoClaw`.
 
 ## Daemon Mode (ZeroClaw)
