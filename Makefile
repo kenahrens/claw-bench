@@ -3,7 +3,7 @@ KUBE_CONTEXT ?= minikube
 KUBECTL := kubectl --context $(KUBE_CONTEXT)
 export KUBE_CONTEXT
 
-.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report smoke-each smoke-one portability-sweep track-b-baseline consistency-check findings-package factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon submit-daemon-task remove-daemon run run-matrix collect score score-track-b
+.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter build-picoclaw-symbols bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report smoke-each smoke-one portability-sweep track-b-baseline consistency-check findings-package factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon submit-daemon-task remove-daemon run run-matrix collect score score-track-b
 
 setup:
 	$(KUBECTL) apply -f k8s/base/namespace.yaml
@@ -26,8 +26,12 @@ setup-egress:
 build-zeroclaw-adapter:
 	eval "$$(minikube docker-env)" && docker build -t zeroclaw-adapter:latest adapters/zeroclaw
 
+build-picoclaw-symbols:
+	eval "$$(minikube docker-env)" && docker build -t picoclaw-symbols:latest adapters/picoclaw
+
 bootstrap:
 	make setup
+	@if ! docker image inspect picoclaw-symbols:latest >/dev/null 2>&1; then make build-picoclaw-symbols; else echo "picoclaw-symbols image already present; skipping build"; fi
 	@if ! docker image inspect zeroclaw-adapter:latest >/dev/null 2>&1; then make build-zeroclaw-adapter; else echo "zeroclaw-adapter image already present; skipping build"; fi
 
 clean-bench:
@@ -38,6 +42,7 @@ setup-stage:
 	make check-secrets
 	make sync-workspace
 	make setup-egress
+	@if [[ "${AGENT_FILTER}" == "" || ",${AGENT_FILTER}," == *",picoclaw," ]]; then if ! docker image inspect picoclaw-symbols:latest >/dev/null 2>&1; then make build-picoclaw-symbols; else echo "picoclaw-symbols image already present; skipping build"; fi; fi
 	@if [[ "${AGENT_FILTER}" == "" || ",${AGENT_FILTER}," == *",zeroclaw," ]]; then if ! docker image inspect zeroclaw-adapter:latest >/dev/null 2>&1; then make build-zeroclaw-adapter; else echo "zeroclaw-adapter image already present; skipping build"; fi; fi
 	make matrix-preflight
 

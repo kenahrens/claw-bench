@@ -49,7 +49,25 @@ if ! kctl wait --for=condition=complete --timeout="${wait_timeout}" "job/${job_n
   timed_out="true"
 fi
 log_path="${raw_results_dir}/${job_name}.txt"
-kctl logs "job/${job_name}" -n claw-bench --timestamps | tee "${log_path}"
+pod_name="$(kctl get pods -n claw-bench -l job-name="${job_name}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+log_container=""
+if [[ -n "${pod_name}" ]]; then
+  log_container="$(kctl get pod "${pod_name}" -n claw-bench -o json 2>/dev/null | python3 -c '
+import json, sys
+pod = json.load(sys.stdin)
+containers = [c.get("name", "") for c in pod.get("spec", {}).get("containers", []) if c.get("name")]
+for name in containers:
+    if not name.startswith("speedscale-"):
+        print(name)
+        break
+' 2>/dev/null || true)"
+fi
+
+if [[ -n "${log_container}" ]]; then
+  kctl logs "job/${job_name}" -n claw-bench --timestamps -c "${log_container}" | tee "${log_path}"
+else
+  kctl logs "job/${job_name}" -n claw-bench --timestamps | tee "${log_path}"
+fi
 
 if [[ "${timed_out}" == "true" ]]; then
   echo "error: job ${job_name} timed out after ${wait_timeout}" >&2

@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: ${DAEMON_NAME}
   namespace: claw-bench
+  annotations:
+    ebpf.speedscale.com/capture: "true"
   labels:
     app: ${DAEMON_NAME}
     claw.agent: zeroclaw
@@ -14,6 +16,8 @@ spec:
       app: ${DAEMON_NAME}
   template:
     metadata:
+      annotations:
+        ebpf.speedscale.com/capture: "true"
       labels:
         app: ${DAEMON_NAME}
         claw.agent: zeroclaw
