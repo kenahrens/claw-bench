@@ -46,6 +46,14 @@
 - [x] M3: Add Track B deterministic coding fixtures and objective score gates.
 - [x] M4: Publish one canonical run snapshot and findings package.
 
+## Observability and Adapter Integration
+
+- [x] Add PicoClaw adapter Dockerfile with symbol-enabled build (golang:1.25-bookworm).
+- [x] Rename picoclaw image to `picoclaw-symbols:latest` and integrate build into Makefile, factory.sh, and bootstrap.
+- [x] Add SpeedScale eBPF capture annotations to all K8s job and deployment templates.
+- [x] Add SpeedScale forwarder namespace to egress allowlist policy.
+- [x] Fix log collection to skip SpeedScale sidecar containers (stdin pipe for robustness).
+
 ## Jobs-to-Deployments Conversion
 
 - [x] Convert all agents from Kubernetes Jobs to long-lived Deployments (daemon-only mode).
@@ -69,8 +77,3 @@
 - [x] Delete old zeroclaw-specific Deployment/Service templates.
 - [x] Update Makefile (remove submit-daemon-task target, add daemon cleanup to bench-smoke).
 - [x] Update README.md and PLAN.md documentation.
-
-This conversion provides:
-- Continuous SpeedScale eBPF capture data (no fragmented per-pod sessions).
-- Production-accurate agent execution (claws run as long-lived processes, not batch Jobs).
-- Simplified architecture (one Deployment template, one task submission mechanism).
