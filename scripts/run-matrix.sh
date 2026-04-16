@@ -16,8 +16,6 @@ matrix_default_model="${DEFAULT_MODEL:-gpt-4o-mini}"
 task_filter="${TASK_FILTER:-T001,T002}"
 tasks_file="${TASKS_FILE:-tasks/tasks.yaml}"
 fail_fast="${FAIL_FAST:-true}"
-cleanup_on_timeout="${CLEANUP_ON_TIMEOUT:-true}"
-auto_clean_runners="${AUTO_CLEAN_RUNNERS:-true}"
 track_b_reset_workspace="${TRACK_B_RESET_WORKSPACE:-false}"
 max_total_runs="${MAX_TOTAL_RUNS:-0}"
 max_failed_runs="${MAX_FAILED_RUNS:-0}"
@@ -63,16 +61,6 @@ if ! [[ "${fail_fast}" =~ ^(true|false)$ ]]; then
   exit 1
 fi
 
-if ! [[ "${cleanup_on_timeout}" =~ ^(true|false)$ ]]; then
-  echo "error: CLEANUP_ON_TIMEOUT must be true or false" >&2
-  exit 1
-fi
-
-if ! [[ "${auto_clean_runners}" =~ ^(true|false)$ ]]; then
-  echo "error: AUTO_CLEAN_RUNNERS must be true or false" >&2
-  exit 1
-fi
-
 if ! [[ "${track_b_reset_workspace}" =~ ^(true|false)$ ]]; then
   echo "error: TRACK_B_RESET_WORKSPACE must be true or false" >&2
   exit 1
@@ -98,10 +86,8 @@ if ! is_non_negative_integer "${max_anthropic_runs}"; then
   exit 1
 fi
 
-if [[ "${auto_clean_runners}" == "true" ]]; then
-  kctl delete jobs -n claw-bench -l app=claw-runner --ignore-not-found >/dev/null || true
-  kctl delete pods -n claw-bench -l app=claw-runner --ignore-not-found >/dev/null || true
-fi
+# Remove any stale daemon deployments from a previous run
+kctl delete deployments -n claw-bench -l claw.mode=daemon --ignore-not-found >/dev/null 2>&1 || true
 
 if command -v minikube >/dev/null 2>&1 && [[ "$(kctl config current-context 2>/dev/null || true)" == "minikube" ]]; then
   eval "$(minikube docker-env)"
@@ -149,14 +135,14 @@ preflight_report="results/matrix-preflight.tsv"
 printf 'agent\timage\tstatus\treason\n' > "${preflight_report}"
 
 selected_rows=()
-while IFS=',' read -r agent _stars _runtime _footprint _use_case image template bin; do
+while IFS=',' read -r agent _stars _runtime _footprint _use_case image bin; do
   [[ -z "${agent}" ]] && continue
 
   if [[ -n "${agent_filter}" && ",${agent_filter}," != *",${agent},"* ]]; then
     continue
   fi
 
-  selected_rows+=("${agent},${image},${template},${bin}")
+  selected_rows+=("${agent},${image},${bin}")
 done < <(tail -n +2 "${matrix_file}")
 
 if [[ "${#selected_rows[@]}" -eq 0 ]]; then
@@ -168,25 +154,28 @@ available_rows=()
 unavailable_count=0
 
 for row in "${selected_rows[@]}"; do
-  IFS=',' read -r agent image template bin <<< "${row}"
+  IFS=',' read -r agent image bin <<< "${row}"
 
-  if [[ -z "${bin}" || -z "${template}" ]]; then
-    printf '%s\t%s\tunavailable\tmissing bin/template in matrix\n' "${agent}" "${image}" >> "${preflight_report}"
+  if [[ -z "${bin}" ]]; then
+    printf '%s\t%s\tunavailable\tmissing bin in matrix\n' "${agent}" "${image}" >> "${preflight_report}"
     unavailable_count=$((unavailable_count + 1))
     continue
   fi
 
-  if docker image inspect "${image}" >/dev/null 2>&1; then
+  if [[ "${image}" == *"ghcr.io"* ]] || [[ "${image}" == *".io/"* ]]; then
+    if docker pull "${image}" >/tmp/matrix-pull-${agent}.log 2>&1; then
+      printf '%s\t%s\tavailable\tpull succeeded\n' "${agent}" "${image}" >> "${preflight_report}"
+      available_rows+=("${row}")
+    else
+      reason="$(tr '\n' ' ' < /tmp/matrix-pull-${agent}.log | sed -E 's/[[:space:]]+/ /g' | cut -c1-180)"
+      printf '%s\t%s\tunavailable\t%s\n' "${agent}" "${image}" "${reason}" >> "${preflight_report}"
+      unavailable_count=$((unavailable_count + 1))
+    fi
+  elif docker image inspect "${image}" >/dev/null 2>&1; then
     printf '%s\t%s\tavailable\talready present locally\n' "${agent}" "${image}" >> "${preflight_report}"
     available_rows+=("${row}")
-    continue
-  fi
-
-  if docker pull "${image}" >/tmp/matrix-pull-${agent}.log 2>&1; then
-    printf '%s\t%s\tavailable\tpull succeeded\n' "${agent}" "${image}" >> "${preflight_report}"
-    available_rows+=("${row}")
   else
-    reason="$(tr '\n' ' ' < /tmp/matrix-pull-${agent}.log | sed -E 's/[[:space:]]+/ /g' | cut -c1-180)"
+    reason="image not found locally and not a remote image"
     printf '%s\t%s\tunavailable\t%s\n' "${agent}" "${image}" "${reason}" >> "${preflight_report}"
     unavailable_count=$((unavailable_count + 1))
   fi
@@ -215,7 +204,7 @@ anthropic_runs=0
 SECONDS=0
 
 for row in "${available_rows[@]}"; do
-  IFS=',' read -r agent image template bin <<< "${row}"
+  IFS=',' read -r agent image bin <<< "${row}"
 
   safety_row="$(awk -F',' -v agent="${agent}" 'NR > 1 && $1 == agent { print $0; exit }' "${safety_file}")"
 
@@ -251,6 +240,26 @@ for row in "${available_rows[@]}"; do
   if [[ -z "${agent_cpu_request}" || -z "${agent_cpu_limit}" || -z "${agent_memory_request}" || -z "${agent_memory_limit}" ]]; then
     echo "error: missing resource safety policy for agent ${agent}" >&2
     exit 1
+  fi
+
+  # Deploy this agent's daemon (or reuse existing)
+  daemon_name="${agent}-daemon"
+  if ! kctl get deployment "${daemon_name}" -n claw-bench >/dev/null 2>&1; then
+    echo "[matrix] deploying daemon for ${agent}"
+    AGENT_NAME="${agent}" \
+    AGENT_IMAGE="${image}" \
+    DAEMON_NAME="${daemon_name}" \
+    DEFAULT_PROVIDER="${matrix_default_provider}" \
+    DEFAULT_MODEL="${matrix_default_model}" \
+    MAX_TOOL_ITERATIONS="${agent_max_tool_iterations}" \
+    APPROVAL_MODE="${agent_approval_mode}" \
+    RESOURCE_CPU_REQUEST="${agent_cpu_request}" \
+    RESOURCE_CPU_LIMIT="${agent_cpu_limit}" \
+    RESOURCE_MEMORY_REQUEST="${agent_memory_request}" \
+    RESOURCE_MEMORY_LIMIT="${agent_memory_limit}" \
+    ./scripts/deploy-daemon.sh
+  else
+    echo "[matrix] daemon ${daemon_name} already running"
   fi
 
   for task_row in "${task_rows[@]}"; do
@@ -297,12 +306,10 @@ for row in "${available_rows[@]}"; do
 
       if ! AGENT_NAME="${agent}" \
         AGENT_IMAGE="${image}" \
-        AGENT_TEMPLATE="${template}" \
-        AGENT_BIN="${bin}" \
+        DAEMON_NAME="${daemon_name}" \
         DEFAULT_PROVIDER="${matrix_default_provider}" \
         DEFAULT_MODEL="${matrix_default_model}" \
         VALIDATE_RESULT=true \
-        CLEANUP_ON_TIMEOUT="${cleanup_on_timeout}" \
         WAIT_TIMEOUT="${agent_wait_timeout}" \
         MAX_TOOL_ITERATIONS="${agent_max_tool_iterations}" \
         APPROVAL_MODE="${agent_approval_mode}" \

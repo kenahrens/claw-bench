@@ -16,11 +16,11 @@ fi
 echo "[clean] remove daemon resources"
 ./scripts/remove-daemon.sh >/dev/null 2>&1 || true
 
-echo "[clean] remove runner jobs"
-kctl delete jobs -n "${namespace}" -l app=claw-runner --ignore-not-found >/dev/null || true
+echo "[clean] remove daemon deployments"
+kctl delete deployments -n "${namespace}" -l claw.mode=daemon --ignore-not-found >/dev/null 2>&1 || true
 
 echo "[clean] remove runner pods"
-kctl delete pods -n "${namespace}" -l app=claw-runner --ignore-not-found >/dev/null || true
+kctl delete pods -n "${namespace}" -l claw.mode=daemon --ignore-not-found >/dev/null 2>&1 || true
 
 echo "[clean] remove old local result artifacts"
 if [[ "${clean_results}" == "true" ]]; then

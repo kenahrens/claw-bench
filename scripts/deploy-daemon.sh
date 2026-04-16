@@ -6,10 +6,10 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 source "${script_dir}/lib/kube.sh"
 
 namespace="${NAMESPACE:-claw-bench}"
-daemon_name="${DAEMON_NAME:-zeroclaw-daemon}"
+agent_name="${AGENT_NAME:?AGENT_NAME is required}"
+agent_image="${AGENT_IMAGE:?AGENT_IMAGE is required}"
+daemon_name="${DAEMON_NAME:-${agent_name}-daemon}"
 daemon_port="${DAEMON_PORT:-8787}"
-local_port="${DAEMON_LOCAL_PORT:-18787}"
-agent_image="${AGENT_IMAGE:-zeroclaw-adapter:latest}"
 default_provider="${DEFAULT_PROVIDER:-openai}"
 default_model="${DEFAULT_MODEL:-gpt-5-mini}"
 max_tool_iterations="${MAX_TOOL_ITERATIONS:-40}"
@@ -29,37 +29,27 @@ if ! [[ "${approval_mode}" =~ ^(default|strict|none)$ ]]; then
   exit 1
 fi
 
-export DAEMON_NAME="${daemon_name}" DAEMON_PORT="${daemon_port}" AGENT_IMAGE="${agent_image}" DEFAULT_PROVIDER="${default_provider}" DEFAULT_MODEL="${default_model}" MAX_TOOL_ITERATIONS="${max_tool_iterations}" APPROVAL_MODE="${approval_mode}" RESOURCE_CPU_REQUEST="${resource_cpu_request}" RESOURCE_CPU_LIMIT="${resource_cpu_limit}" RESOURCE_MEMORY_REQUEST="${resource_memory_request}" RESOURCE_MEMORY_LIMIT="${resource_memory_limit}"
+# Per-agent home directory
+case "${agent_name}" in
+  openclaw|nemoclaw) AGENT_HOME="/home/node" ;;
+  picoclaw) AGENT_HOME="/home/picoclaw" ;;
+  *) AGENT_HOME="/home/node" ;;
+esac
 
-envsubst < k8s/templates/deployment-zeroclaw-daemon.yaml | kctl apply -f -
-envsubst < k8s/templates/service-zeroclaw-daemon.yaml | kctl apply -f -
+# Remove any existing deployment for this daemon
+if kctl get deployment "${daemon_name}" -n "${namespace}" >/dev/null 2>&1; then
+  echo "[deploy-daemon] removing existing deployment ${daemon_name}"
+  kctl delete deployment "${daemon_name}" -n "${namespace}" --ignore-not-found >/dev/null 2>&1 || true
+  sleep 2
+fi
 
+export DAEMON_NAME AGENT_NAME AGENT_IMAGE AGENT_HOME DAEMON_PORT DEFAULT_PROVIDER DEFAULT_MODEL \
+  MAX_TOOL_ITERATIONS APPROVAL_MODE RESOURCE_CPU_REQUEST RESOURCE_CPU_LIMIT \
+  RESOURCE_MEMORY_REQUEST RESOURCE_MEMORY_LIMIT
+
+envsubst < k8s/templates/deployment-agent.yaml | kctl apply -f -
+
+echo "[deploy-daemon] waiting for ${daemon_name} rollout"
 kctl rollout status "deployment/${daemon_name}" -n "${namespace}" --timeout=180s
 
-pod_name="$(kctl get pods -n "${namespace}" -l app="${daemon_name}" -o jsonpath='{.items[0].metadata.name}')"
-pair_code="$(kctl logs "${pod_name}" -n "${namespace}" 2>&1 | perl -ne 'if(/X-Pairing-Code: ([0-9]+)/){print $1; exit}')"
-
-if [[ -z "${pair_code}" ]]; then
-  echo "error: unable to find daemon pairing code in pod logs" >&2
-  exit 1
-fi
-
-kctl port-forward -n "${namespace}" "pod/${pod_name}" "${local_port}:${daemon_port}" >/tmp/${daemon_name}-port-forward.log 2>&1 &
-pf_pid=$!
-trap 'kill ${pf_pid} >/dev/null 2>&1 || true' EXIT
-sleep 2
-
-pair_response="$(curl -sS -X POST "http://127.0.0.1:${local_port}/pair" -H "X-Pairing-Code: ${pair_code}")"
-token="$(printf '%s' "${pair_response}" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("token", ""))')"
-
-if [[ -z "${token}" ]]; then
-  echo "error: failed to pair daemon. response: ${pair_response}" >&2
-  exit 1
-fi
-
-kctl create secret generic "${daemon_name}-auth" \
-  -n "${namespace}" \
-  --from-literal=bearer_token="${token}" \
-  --dry-run=client -o yaml | kctl apply -f - >/dev/null
-
-echo "deployed ${daemon_name} and stored auth token in secret ${daemon_name}-auth"
+echo "deployed ${daemon_name} (agent=${agent_name}, image=${agent_image})"

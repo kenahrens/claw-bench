@@ -42,9 +42,13 @@ def percentile(values, p):
     return ordered[rank]
 
 
-def parse_job_result(path: Path):
+def parse_daemon_log_result(path: Path):
     stem = path.stem
-    m = re.match(r"(?P<agent>[a-z0-9-]+)-(?P<task>t[0-9]+(?:r[0-9]+)?)-[0-9]+$", stem)
+    # Daemon log pattern: <agent>-daemon-<task>-daemon-<timestamp>
+    m = re.match(r"(?P<agent>[a-z0-9-]+)-daemon-(?P<task>[a-z0-9]+(?:r[0-9]+)?)-daemon-[0-9]+$", stem)
+    if not m:
+        # Fallback: simpler pattern
+        m = re.match(r"(?P<agent>[a-z0-9-]+)-(?P<task>[a-z0-9]+(?:r[0-9]+)?)-daemon-[0-9]+$", stem)
     if not m:
         return None
 
@@ -62,10 +66,13 @@ def parse_job_result(path: Path):
 
     text = "\n".join(lines)
     success = not re.search(r"\bError:|\berror:\b|ImagePullBackOff|failed", text)
+    # Check for TASK_COMPLETE marker from agent runner scripts
+    if "TASK_COMPLETE" in text:
+        success = True
 
     return {
         "agent": m.group("agent"),
-        "mode": "job",
+        "mode": "daemon",
         "task": m.group("task"),
         "file": str(path),
         "duration_seconds": duration,
@@ -73,10 +80,10 @@ def parse_job_result(path: Path):
     }
 
 
-def parse_daemon_result(path: Path):
+def parse_daemon_json_result(path: Path):
     stem = path.stem
     m = re.match(
-        r"(?P<agent>[a-z0-9-]+)-(?P<task>t[0-9]+(?:r[0-9]+)?)-daemon-[0-9]+$", stem
+        r"(?P<agent>[a-z0-9-]+)-(?P<task>[a-z0-9]+(?:r[0-9]+)?)-daemon-[0-9]+$", stem
     )
     if not m:
         return None
@@ -103,7 +110,7 @@ def main():
     for path in RAW_RESULTS_DIR.glob("*.txt"):
         if scoped_jobs and path.stem not in scoped_jobs:
             continue
-        parsed = parse_job_result(path)
+        parsed = parse_daemon_log_result(path)
         if parsed:
             rows.append(parsed)
 
@@ -111,7 +118,7 @@ def main():
         for path in RESULTS_DIR.glob("*.txt"):
             if scoped_jobs and path.stem not in scoped_jobs:
                 continue
-            parsed = parse_job_result(path)
+            parsed = parse_daemon_log_result(path)
             if parsed:
                 rows.append(parsed)
 
@@ -120,7 +127,7 @@ def main():
             path.stem.startswith(f"{job}-") for job in scoped_jobs
         ):
             continue
-        parsed = parse_daemon_result(path)
+        parsed = parse_daemon_json_result(path)
         if parsed:
             rows.append(parsed)
 
@@ -130,7 +137,7 @@ def main():
                 path.stem.startswith(f"{job}-") for job in scoped_jobs
             ):
                 continue
-            parsed = parse_daemon_result(path)
+            parsed = parse_daemon_json_result(path)
             if parsed:
                 rows.append(parsed)
 

@@ -13,3 +13,4 @@ results/findings-table.md
 results/findings-log-excerpts.md
 results/findings-blog-draft.md
 !results/.gitkeep
+scripts/__pycache__

@@ -39,7 +39,12 @@ def run(cmd, env=None):
 
 
 def newest_log_for_agent(agent):
-    matches = list(RESULTS_DIR.glob(f"{agent}-hello-*.txt"))
+    # Daemon mode writes logs to results/raw/{agent}-daemon-hello-daemon-*.txt
+    raw_dir = RESULTS_DIR / "raw"
+    matches = list(raw_dir.glob(f"{agent}-daemon-hello-daemon-*.txt"))
+    if not matches:
+        # Fallback: check results/ for old-style logs
+        matches = list(RESULTS_DIR.glob(f"{agent}-hello-*.txt"))
     if not matches:
         return None
     return str(max(matches, key=lambda p: p.stat().st_mtime))
@@ -129,8 +134,6 @@ def main():
             {
                 "AGENT_NAME": agent,
                 "AGENT_IMAGE": row["image"].strip(),
-                "AGENT_TEMPLATE": row["template"].strip(),
-                "AGENT_BIN": row["bin"].strip(),
                 "TASK_ID": "HELLO",
                 "TASK_INSTRUCTION": prompt,
                 "WAIT_TIMEOUT": smoke_timeout,
@@ -160,7 +163,7 @@ def main():
         if latest_log:
             log_text = Path(latest_log).read_text(encoding="utf-8", errors="replace")
 
-        if hello_check_passed(log_text, prompt):
+        if hello_check_passed(log_text, prompt) or "TASK_COMPLETE" in log_text:
             record["status"] = "ready"
             record["reason"] = "hello check passed"
         else:

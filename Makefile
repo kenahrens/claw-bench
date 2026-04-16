@@ -3,7 +3,7 @@ KUBE_CONTEXT ?= minikube
 KUBECTL := kubectl --context $(KUBE_CONTEXT)
 export KUBE_CONTEXT
 
-.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter build-picoclaw-symbols bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report smoke-each smoke-one portability-sweep track-b-baseline consistency-check findings-package factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon submit-daemon-task remove-daemon run run-matrix collect score score-track-b
+.PHONY: setup setup-secrets check-secrets sync-workspace setup-egress build-zeroclaw-adapter build-picoclaw-symbols bootstrap clean-bench setup-stage compare validate bench-help bench-init bench-smoke bench-run bench-reset bench-report smoke-each smoke-one portability-sweep track-b-baseline consistency-check findings-package factory-summary preflight-gate doctor tasks easy eval factory easy-matrix matrix-preflight deploy-daemon remove-daemon run run-matrix collect score score-track-b
 
 setup:
 	$(KUBECTL) apply -f k8s/base/namespace.yaml
@@ -74,6 +74,7 @@ bench-smoke:
 	make clean-bench
 	make setup-stage AGENT_FILTER=zeroclaw
 	AGENT_NAME=zeroclaw AGENT_IMAGE=zeroclaw-adapter:latest TASK_ID=SMOKE TASK_INSTRUCTION="Reply with exactly: SMOKE_OK" MAX_TOOL_ITERATIONS=5 APPROVAL_MODE=none REQUIRE_GITHUB_TOKEN=false WAIT_TIMEOUT=$${WAIT_TIMEOUT:-120s} ./scripts/run-task.sh
+	make remove-daemon AGENT_NAME=zeroclaw
 
 bench-run:
 	make compare
@@ -119,17 +120,11 @@ tasks:
 deploy-daemon:
 	./scripts/deploy-daemon.sh
 
-submit-daemon-task:
-	./scripts/submit-daemon-task.sh
-
 remove-daemon:
 	./scripts/remove-daemon.sh
 
 run-task-%:
 	TASK_REF=TASK_$* ./scripts/run-task.sh
-
-daemon-task-%:
-	TASK_REF=TASK_$* ./scripts/submit-daemon-task.sh
 
 easy:
 	./scripts/easy-button.sh

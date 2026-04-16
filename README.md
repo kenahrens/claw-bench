@@ -18,14 +18,15 @@ The benchmark matrix is tracked in `config/agents.csv`.
 
 ## Repository Layout
 
-- `config/agents.csv`: runtime matrix and image/template mapping.
+- `config/agents.csv`: runtime matrix and image mapping.
 - `config/agents-capabilities.csv`: per-agent command/interaction capability manifest.
 - `config/agents-safety.csv`: per-agent timeout, approval mode, and tool-iteration policy.
 - `config/eval.env`: checked-in run profile for one-command evaluation.
 - `tasks/tasks.yaml`: benchmark task suite.
 - `k8s/base`: namespace, PVC, secrets template, baseline deny policy.
-- `k8s/templates`: generic and ZeroClaw-compatible Job manifests.
+- `k8s/templates`: agent Deployment manifest for daemon-mode execution.
 - `scripts`: setup, policy generation, run orchestration, and log collection.
+- `scripts/agents`: per-agent task runner scripts invoked via `kubectl exec`.
 - `adapters/zeroclaw`: optional adapter image for restrictive runtime behavior.
 - `adapters/picoclaw`: optional adapter image with symbol-enabled build for PicoClaw.
 
@@ -43,7 +44,7 @@ The benchmark matrix is tracked in `config/agents.csv`.
 
 The policy also allows egress to the SpeedScale forwarder in the `speedscale` namespace for observability.
 
-The policy resolves current A records and restricts agent pods (`app=claw-runner`) to DNS + HTTPS on allowlisted destinations.
+The policy resolves current A records and restricts daemon pods (`claw.mode=daemon`) to DNS + HTTPS on allowlisted destinations.
 
 ## Prereqs
 
@@ -99,7 +100,7 @@ Matrix notes:
 - Set `TASK_FILTER=` (empty) to run all tasks, or provide a list like `TASK_FILTER=T001,T002,T003`.
 - Override task source with `TASKS_FILE=...` (default `tasks/tasks.yaml`), e.g. `tasks/track-b-tasks.yaml`.
 - Set `FAIL_FAST=false` only when you intentionally want to continue after failures.
-- Timed-out runs are cleaned up automatically by default (`CLEANUP_ON_TIMEOUT=true`).
+
 - Budget guardrails are enforced when set: `MAX_TOTAL_RUNS`, `MAX_FAILED_RUNS`, `MAX_WALL_CLOCK_MIN`, `MAX_ANTHROPIC_RUNS` (`0` disables a guardrail).
 - `preflight-gate` is strict by default: it verifies guardrails are set and runs per-agent smoke contract checks (`RUN_SMOKE_CONTRACTS=true`) before full matrix execution.
 - Enable deterministic Track B score gates with `TRACK_B_EVAL=true`; each run writes `results/raw/<job>-trackb-eval.json`.
@@ -110,34 +111,33 @@ Matrix notes:
 - To compare the full matrix, ensure every image in `config/agents.csv` is pullable from your environment. Note: `picoclaw-symbols:latest` and `zeroclaw-adapter:latest` are built locally (via `make build-picoclaw-symbols` / `make build-zeroclaw-adapter`); other agent images are pulled from remote registries.
 - `nemoclaw` is configured as `nemoclaw:latest` and may require building a local image from `https://github.com/NVIDIA/NemoClaw`.
 
-## Daemon Mode (ZeroClaw)
+## Daemon-Only Architecture
 
-Use daemon mode as a separate benchmark track for steady-state service behavior.
+All agents run as long-lived Kubernetes Deployments (daemons), not one-shot Jobs. This matches how claws run in production and provides continuous SpeedScale eBPF capture data.
 
-1. Deploy and pair the daemon with `make deploy-daemon`.
-2. Submit a task over HTTP with `make daemon-task-1` (or `make daemon-task-2`, etc.).
-3. Repeat task submissions as needed; each response is stored under `results/`.
-4. Tear down daemon resources with `make remove-daemon`.
+1. `make deploy-daemon AGENT_NAME=<agent>` — deploys a daemon for any configured agent.
+2. Tasks are submitted via `kubectl exec`, which invokes the agent's task runner script (`scripts/agents/<agent>.sh`).
+3. Each agent runs in a pod that stays alive (`tail -f /dev/null`); tasks execute inside the running container.
+4. `make remove-daemon AGENT_NAME=<agent>` — tears down the daemon deployment.
 
 Notes:
 
-- Daemon mode preserves runtime state between requests; do not mix its results with cold-start job runs.
-- Daemon auth token is stored in Kubernetes secret `${DAEMON_NAME:-zeroclaw-daemon}-auth`.
+- The generic Deployment template is `k8s/templates/deployment-agent.yaml`.
+- Per-agent task runners live in `scripts/agents/` (e.g., `scripts/agents/zeroclaw.sh`).
+- Daemon pods share a workspace PVC at `/workspace`.
+- SpeedScale eBPF capture annotations are applied to all daemon pods for continuous observability.
 
 ## Notes
 
 - `claw-secrets` should contain `openai_api_key`, `anthropic_api_key`, `llm_api_key`, and `github_token`.
 - Use `scripts/setup-secrets.sh` with `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` for mixed-provider runs.
-- `make smoke-one` is the recommended contract-debug path: it runs one job at a time and blocks on failures.
+- `make smoke-one` is the recommended contract-debug path: it runs one agent daemon at a time and blocks on failures.
 
-- Use `k8s/templates/job-zeroclaw.yaml` when the default template fails due to stricter runtime assumptions.
-- OpenClaw uses `k8s/templates/job-openclaw.yaml` to align with its `openclaw agent --local` command contract.
-- NemoClaw uses `k8s/templates/job-nemoclaw.yaml` to force the configured provider/model before each run.
-- NanoClaw uses `k8s/templates/job-nanoclaw.yaml` to send the required stdin JSON payload to `/app/entrypoint.sh`.
-- PicoClaw uses `k8s/templates/job-picoclaw.yaml` to align with its `picoclaw agent -m` command contract.
-- The ZeroClaw template keeps non-root and dropped caps but allows writable root filesystem when required.
+- Each agent has a task runner in `scripts/agents/` that handles its specific invocation contract.
+- The generic Deployment template applies non-root, dropped caps, and writable tmp/home volumes.
 - Raw per-run logs and gate outputs are written to `results/raw/` for post-run scoring and analysis.
 - Scoring is scoped to the active run set using `results/current-run-jobs.txt`.
+- All agents run in daemon (Deployment) mode — there are no Job-based execution paths.
 - Final comparison summary is written to `results/factory-summary.json`.
 - Track B fixture mapping lives in `config/track-b-fixtures.csv` and deterministic fixture tasks live in `tasks/track-b-tasks.yaml`.
 

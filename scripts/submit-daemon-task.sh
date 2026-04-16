@@ -10,38 +10,48 @@ IFS=$'\t' read -r resolved_task_id resolved_task_instruction < <(
 )
 
 namespace="${NAMESPACE:-claw-bench}"
-daemon_name="${DAEMON_NAME:-zeroclaw-daemon}"
-daemon_port="${DAEMON_PORT:-8787}"
-local_port="${DAEMON_LOCAL_PORT:-18787}"
+agent_name="${AGENT_NAME:?AGENT_NAME is required}"
+daemon_name="${DAEMON_NAME:-${agent_name}-daemon}"
+task_timeout="${TASK_TIMEOUT:-10m}"
+raw_results_dir="results/raw"
 
-token_b64="$(kctl get secret "${daemon_name}-auth" -n "${namespace}" -o jsonpath='{.data.bearer_token}' 2>/dev/null || true)"
-if [[ -z "${token_b64}" ]]; then
-  echo "error: daemon auth secret ${daemon_name}-auth not found; run ./scripts/deploy-daemon.sh first" >&2
+# Find the agent runner script
+agent_runner="${script_dir}/agents/${agent_name}.sh"
+if [[ ! -f "${agent_runner}" ]]; then
+  echo "error: no task runner found for agent ${agent_name} at ${agent_runner}" >&2
   exit 1
 fi
 
-token="$(printf '%s' "${token_b64}" | base64 --decode)"
-payload="$(TASK_INSTRUCTION="${resolved_task_instruction}" python3 -c 'import json,os; print(json.dumps({"message": os.environ["TASK_INSTRUCTION"]}))')"
-
-pod_name="$(kctl get pods -n "${namespace}" -l app="${daemon_name}" -o jsonpath='{.items[0].metadata.name}')"
+# Find the running pod
+pod_name="$(kctl get pods -n "${namespace}" -l app="${daemon_name}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
 if [[ -z "${pod_name}" ]]; then
-  echo "error: no daemon pod found for ${daemon_name}; run ./scripts/deploy-daemon.sh first" >&2
+  echo "error: no pod found for daemon ${daemon_name}; run deploy-daemon.sh first" >&2
   exit 1
 fi
 
-kctl port-forward -n "${namespace}" "pod/${pod_name}" "${local_port}:${daemon_port}" >/tmp/${daemon_name}-port-forward.log 2>&1 &
-pf_pid=$!
-trap 'kill ${pf_pid} >/dev/null 2>&1 || true' EXIT
-sleep 2
+# Copy the agent runner script into the pod
+kctl cp "${agent_runner}" "${namespace}/${pod_name}:/tmp/agent-task.sh" -c agent
+kctl exec "${pod_name}" -n "${namespace}" -c agent -- chmod +x /tmp/agent-task.sh
 
-response="$(curl -sS -X POST "http://127.0.0.1:${local_port}/webhook" \
-  -H "Authorization: Bearer ${token}" \
-  -H "Content-Type: application/json" \
-  -d "${payload}")"
-
-mkdir -p results/raw
+# Submit the task via kubectl exec
+# The runner script reads TASK_INSTRUCTION from the environment
 task_suffix="$(printf '%s' "${resolved_task_id}" | tr '[:upper:]' '[:lower:]')"
-out_file="results/raw/${daemon_name}-${task_suffix}-daemon-$(date +%s).json"
-printf '%s\n' "${response}" > "${out_file}"
+log_path="${raw_results_dir}/${daemon_name}-${task_suffix}-daemon-$(date +%s).txt"
+mkdir -p "${raw_results_dir}"
 
-echo "saved daemon response to ${out_file}"
+echo "[submit] running task ${resolved_task_id} on ${daemon_name} (pod ${pod_name})"
+
+set +e
+# Base64-encode the task instruction to avoid shell injection risks
+b64_instruction="$(printf '%s' "${resolved_task_instruction}" | base64)"
+kctl exec "${pod_name}" -n "${namespace}" -c agent -- \
+  sh -c "TASK_INSTRUCTION=\$(echo '${b64_instruction}' | base64 -d) /tmp/agent-task.sh" 2>&1 | tee "${log_path}"
+exit_code=$?
+set -e
+
+if [[ ${exit_code} -ne 0 ]]; then
+  echo "error: task ${resolved_task_id} failed on ${daemon_name} (exit ${exit_code})" >&2
+  exit 1
+fi
+
+echo "saved task output to ${log_path}"
