@@ -24,6 +24,7 @@ allow_package_registries="${ALLOW_PACKAGE_REGISTRIES:-false}"
 clean_start="${FACTORY_CLEAN_START:-true}"
 use_existing_secrets="${FACTORY_USE_EXISTING_SECRETS:-true}"
 build_zeroclaw_adapter="${BUILD_ZEROCLAW_ADAPTER:-auto}"
+build_picoclaw_symbols="${BUILD_PICOCLAW_SYMBOLS:-auto}"
 comparison_mode="${COMPARISON_MODE:-available}"
 
 if [[ "${comparison_mode}" == "full5" ]]; then
@@ -62,6 +63,11 @@ fi
 
 if ! [[ "${build_zeroclaw_adapter}" =~ ^(auto|always|never)$ ]]; then
   echo "error: BUILD_ZEROCLAW_ADAPTER must be auto, always, or never" >&2
+  exit 1
+fi
+
+if ! [[ "${build_picoclaw_symbols}" =~ ^(auto|always|never)$ ]]; then
+  echo "error: BUILD_PICOCLAW_SYMBOLS must be auto, always, or never" >&2
   exit 1
 fi
 
@@ -117,6 +123,21 @@ if [[ "${build_zeroclaw_adapter}" != "never" && ( -z "${agent_filter}" || ",${ag
     make build-zeroclaw-adapter
   else
     echo "[factory] zeroclaw adapter present locally; skipping build"
+  fi
+fi
+
+if [[ "${build_picoclaw_symbols}" != "never" && ( -z "${agent_filter}" || ",${agent_filter}," == *",picoclaw," ) ]]; then
+  should_build="true"
+
+  if [[ "${build_picoclaw_symbols}" == "auto" ]] && docker image inspect picoclaw-symbols:latest >/dev/null 2>&1; then
+    should_build="false"
+  fi
+
+  if [[ "${should_build}" == "true" ]]; then
+    echo "[factory] build picoclaw symbols image"
+    make build-picoclaw-symbols
+  else
+    echo "[factory] picoclaw symbols image present locally; skipping build"
   fi
 fi
 

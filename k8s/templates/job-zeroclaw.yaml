@@ -3,6 +3,8 @@ kind: Job
 metadata:
   name: ${JOB_NAME}
   namespace: claw-bench
+  annotations:
+    ebpf.speedscale.com/capture: "true"
   labels:
     claw.agent: zeroclaw
     claw.task: ${TASK_ID}
@@ -10,6 +12,8 @@ spec:
   backoffLimit: 0
   template:
     metadata:
+      annotations:
+        ebpf.speedscale.com/capture: "true"
       labels:
         app: claw-runner
         claw.agent: zeroclaw
